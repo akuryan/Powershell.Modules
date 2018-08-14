@@ -29,7 +29,7 @@ Module could be used as is, installed as [Nuget package](), could be installed a
 
 ```powershell
 Import-Module azure-costs-saver.psm1
-Update-ResourceSized -resourceGroupName $rgName -Downscale ($true|$false)
+Set-ResourceSizesForCostsSaving -ResourceGroupName $rgName -Downscale ($true|$false) -executionEnv manual
 ```
 
 ### VSTS extension
