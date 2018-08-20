@@ -7,6 +7,10 @@ If you select to downscale your resources (suggestion: run it at evening) - it w
 
 SQL databases sizes tags are stored on SQL server resource, as they tend to dissappear on SQL database resource.
 
+## Word of advise
+
+Be extra careful when modifying this module, as it consumed by Teamcity metarunner and VSTS extension. While VSTS extension itself will be OK with changes (it needs nuget to be installed and package will be pushed with preinstalled nuget), Teamcity metarunner will install nuget package on runtime.
+
 ## Issues
 
 1. Script will silently fail if you try to run upscaling before downscaling

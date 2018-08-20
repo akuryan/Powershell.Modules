@@ -10,7 +10,8 @@ function WriteLogToHost {
 function ProcessWebApps {
     param (
         $webApps,
-        $logStringFormat
+        $logStringFormat,
+        $ResourceGroupName
         )
 
     $whatsProcessing = "Web app farms"
@@ -79,7 +80,8 @@ function ProcessWebApps {
 function ProcessVirtualMachines {
     param (
         $vms,
-        $logStringFormat
+        $logStringFormat,
+        $ResourceGroupName
         )
 
     $whatsProcessing = "Virtual machines"
@@ -111,7 +113,8 @@ function ProcessVirtualMachines {
 function ProcessSqlDatabases {
     param (
         $sqlServers,
-        $logStringFormat
+        $logStringFormat,
+        $ResourceGroupName
         )
 
     $whatsProcessing = "SQL servers"
@@ -284,7 +287,7 @@ function Set-ResourceSizesForCostsSaving {
         Exit $false
     }
 
-    ProcessWebApps -webApps $resources.where( {$_.ResourceType -eq "Microsoft.Web/serverFarms" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat;
-    ProcessSqlDatabases -sqlServers $resources.where( {$_.ResourceType -eq "Microsoft.Sql/servers" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat;
-    ProcessVirtualMachines -vms $resources.where( {$_.ResourceType -eq "Microsoft.Compute/virtualMachines" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat;
+    ProcessWebApps -webApps $resources.where( {$_.ResourceType -eq "Microsoft.Web/serverFarms" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
+    ProcessSqlDatabases -sqlServers $resources.where( {$_.ResourceType -eq "Microsoft.Sql/servers" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
+    ProcessVirtualMachines -vms $resources.where( {$_.ResourceType -eq "Microsoft.Compute/virtualMachines" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
 }
