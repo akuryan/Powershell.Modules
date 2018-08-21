@@ -271,7 +271,7 @@ function Set-ResourceSizesForCostsSaving {
     }
     if ($executionEnv -eq "vsts")
     {
-        $logStringFormat = "##vso[task.logissue type=warning;] {0}}']";
+        $logStringFormat = "##vso[task.logissue type=warning;] {0}";
     }
 
     Write-Host "We are going to downscale? $Downscale"
