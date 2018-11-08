@@ -45,7 +45,14 @@ function ProcessWebApps {
             $tags = @{}
         }
 
-        $cheaperTiers = "Free","Shared","Basic"
+        #we do not want to upscale those slots to Standard :)
+        $excludedTiers = "Free","Shared","Basic"
+        #if installed AzureRm is v.2 - we shall exclude PremiumV2 as well (it is not supported there)
+        $azureRMModules = Get-Module -Name AzureRM -ListAvailable | Select-Object Version | Format-Table | Out-String
+        if($azureRMModules -match "2") {
+            #we have azureRMModules version 2 - PremiumV2 is not supported here
+            $excludedTiers += "PremiumV2"
+        }
 
         if ($Downscale) {
             #we need to store current web app sizes in tags
@@ -58,14 +65,14 @@ function ProcessWebApps {
             (Get-AzureRmResource -ResourceId $resourceId).Tags
 
             #we shall proceed only if we are in more expensive tiers
-            if ($cheaperTiers -notcontains $webFarmResource.Sku.tier) {
+            if ($excludedTiers -notcontains $webFarmResource.Sku.tier) {
 				#If web app have slots - it could not be downscaled to Basic :(
                 Write-Host "Downscaling $resourceName to tier: Standard, workerSize: Small and 1 worker"
                 Set-AzureRmAppServicePlan -Tier Standard -NumberofWorkers 1 -WorkerSize Small -ResourceGroupName $webFarmResource.ResourceGroupName -Name $webFarmResource.Name
             }
         }
         else {
-            if ($cheaperTiers -notcontains $tags.costsSaverTier) {
+            if ($excludedTiers -notcontains $tags.costsSaverTier) {
                 #we shall not try to set resource
                 $targetTier = $tags.costsSaverTier
                 $targetWorkerSize = $tags.costsSaverWorkerSize
