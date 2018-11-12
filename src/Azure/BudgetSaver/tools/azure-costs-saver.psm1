@@ -287,7 +287,7 @@ function Set-ResourceSizesForCostsSaving {
     Write-Host "Resources will be selected from $ResourceGroupName resource group"
 
     #Get all resources, which are in resource groups, which contains our name
-    $resources = Find-AzureRmResource -ResourceGroupNameContains $ResourceGroupName
+    $resources = Get-AzureRmResource | Where {$_.ResourceGroupName -eq $ResourceGroupName}
 
     if (($resources | Measure-Object).Count -le 0)
     {
