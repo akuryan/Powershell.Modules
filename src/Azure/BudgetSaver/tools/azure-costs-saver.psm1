@@ -261,6 +261,39 @@ function ProcessSqlDatabases {
     }
 }
 
+function ProcessVirtualMachinesScaleSets {
+    param (
+        $vmScaleSets,
+        $logStringFormat,
+        $ResourceGroupName
+        )
+
+    $whatsProcessing = "Virtual machines scale sets"
+    Write-Host "Processing $whatsProcessing"
+    $amount = ($vmScaleSets | Measure-Object).Count
+    if ($amount -le 0) {
+        $messageToLog = "No {0} was retrieved for {1}" -f $whatsProcessing, $ResourceGroupName;
+        WriteLogToHost -logMessage $messageToLog -logFormat $logStringFormat
+        return;
+    }
+
+    Write-Host "There is $amount $whatsProcessing to be processed."
+
+    foreach ($vmss in $vmScaleSets) {
+        $resourceName = $vmss.Name
+        if ($Downscale) {
+            #Deprovision VMs
+            Write-Host "Stopping and deprovisioning $resourceName"
+            Stop-AzureRmVmss -ResourceGroupName $ResourceGroupName -VMScaleSetName $vmss.Name -Force
+        }
+        else {
+            #Start them up
+            Write-Host "Starting $resourceName"
+            Start-AzureRmVmss -ResourceGroupName $ResourceGroupName -VMScaleSetName $vmss.Name
+        }
+    }
+}
+
 function Set-ResourceSizesForCostsSaving {
     param (
         [Parameter(Mandatory=$True)]
@@ -287,7 +320,7 @@ function Set-ResourceSizesForCostsSaving {
     Write-Host "Resources will be selected from $ResourceGroupName resource group"
 
     #Get all resources, which are in resource groups, which contains our name
-    $resources = Get-AzureRmResource | Where {$_.ResourceGroupName -eq $ResourceGroupName}
+    $resources = Get-AzureRmResource | Where-Object {$_.ResourceGroupName -eq $ResourceGroupName}
 
     if (($resources | Measure-Object).Count -le 0)
     {
@@ -299,4 +332,5 @@ function Set-ResourceSizesForCostsSaving {
     ProcessWebApps -webApps $resources.where( {$_.ResourceType -eq "Microsoft.Web/serverFarms" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
     ProcessSqlDatabases -sqlServers $resources.where( {$_.ResourceType -eq "Microsoft.Sql/servers" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
     ProcessVirtualMachines -vms $resources.where( {$_.ResourceType -eq "Microsoft.Compute/virtualMachines" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
+    ProcessVirtualMachinesScaleSets -vmScaleSets $resources.where( {$_.ResourceType -eq "Microsoft.Compute/virtualMachineScaleSets" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
 }
