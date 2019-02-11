@@ -46,7 +46,7 @@ function ProcessWebApps {
         }
 
         #we do not want to upscale those slots to Standard :)
-        $excludedTiers = "Free","Shared","Basic"
+        $excludedTiers = "Free","Shared"
         #if installed AzureRm is v.2 - we shall exclude PremiumV2 as well (it is not supported there)
         $azureRMModules = Get-Module -Name AzureRM -ListAvailable | Select-Object Version | Format-Table | Out-String
         Write-Verbose "Azure RM Modules: $azureRMModules";
@@ -68,9 +68,36 @@ function ProcessWebApps {
 
             #we shall proceed only if we are in more expensive tiers
             if ($excludedTiers -notcontains $webFarmResource.Sku.tier) {
-				#If web app have slots - it could not be downscaled to Basic :(
-                Write-Host "Downscaling $resourceName to tier: Standard, workerSize: Small and 1 worker"
-                Set-AzureRmAppServicePlan -Tier Standard -NumberofWorkers 1 -WorkerSize Small -ResourceGroupName $webFarmResource.ResourceGroupName -Name $webFarmResource.Name
+                #get app service plan rich data
+                $aspEnriched = Get-AzureRmAppServicePlan -ResourceGroupName $webFarmResource.ResourceGroupName -Name $webFarmResource.Name;
+                #get all apps assigned to ASP
+                $apps = Get-AzureRmWebApp -AppServicePlan $aspEnriched;
+
+                $slots = @();
+                #traverse each app to check, if it actually have a slot assigned
+                foreach ($app in $apps) {
+                    $appName = $app.Name;
+                    $appRg = $app.ResourceGroup;
+                    Write-Verbose "Trying to get slot for $appName in resource group $appRg";
+                    #If web app have slots - it could not be downscaled to Basic :(
+                    #test for presence of slot
+                    $slot = Get-AzureRmWebAppSlot -ResourceGroupName $appRg -name $appName;
+                    Write-Verbose "Slot value:";
+                    Write-Verbose $slot;
+                    $slots += $slot;
+                }
+
+                #if in $slots array we have something - that one of web apps, assigned to web farm have deployment slot
+                $slotIsPresent = ($slots.Count -ne 0);
+                Write-Verbose "Do app service plan $resourceName have slot assigned: $slotIsPresent";
+
+                if ($slotIsPresent) {
+                    Write-Host "Downscaling $resourceName to tier: Standard, workerSize: Small and 1 worker"
+                    Set-AzureRmAppServicePlan -Tier Standard -NumberofWorkers 1 -WorkerSize Small -ResourceGroupName $webFarmResource.ResourceGroupName -Name $webFarmResource.Name
+                } else {
+                    Write-Host "Downscaling $resourceName to tier: Basic, workerSize: Small and 1 worker"
+                    Set-AzureRmAppServicePlan -Tier Basic -NumberofWorkers 1 -WorkerSize Small -ResourceGroupName $webFarmResource.ResourceGroupName -Name $webFarmResource.Name
+                }
             }
         }
         else {
