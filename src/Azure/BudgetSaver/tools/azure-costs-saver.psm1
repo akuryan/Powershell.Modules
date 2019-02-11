@@ -9,14 +9,14 @@ function WriteLogToHost {
 
 function ProcessWebApps {
     param (
-        $webApps,
+        $webAppFarms,
         $logStringFormat,
         $ResourceGroupName
         )
 
     $whatsProcessing = "Web app farms"
     Write-Host "Processing $whatsProcessing"
-    $amount = ($webApps | Measure-Object).Count
+    $amount = ($webAppFarms | Measure-Object).Count
     if ($amount -le 0) {
         $messageToLog = "No {0} was retrieved for {1}" -f $whatsProcessing, $ResourceGroupName;
         WriteLogToHost -logMessage $messageToLog -logFormat $logStringFormat
@@ -32,7 +32,7 @@ function ProcessWebApps {
 
     Write-Host "There is $amount $whatsProcessing to be processed."
 
-    foreach ($farm in $webApps) {
+    foreach ($farm in $webAppFarms) {
         $resourceId = $farm.ResourceId
         $webFarmResource = Get-AzureRmResource -ResourceId $resourceId -ExpandProperties
         $resourceName = $webFarmResource.Name
@@ -329,7 +329,7 @@ function Set-ResourceSizesForCostsSaving {
         Exit $false
     }
 
-    ProcessWebApps -webApps $resources.where( {$_.ResourceType -eq "Microsoft.Web/serverFarms" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
+    ProcessWebApps -webAppFarms $resources.where( {$_.ResourceType -eq "Microsoft.Web/serverFarms" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
     ProcessSqlDatabases -sqlServers $resources.where( {$_.ResourceType -eq "Microsoft.Sql/servers" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
     ProcessVirtualMachines -vms $resources.where( {$_.ResourceType -eq "Microsoft.Compute/virtualMachines" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
     ProcessVirtualMachinesScaleSets -vmScaleSets $resources.where( {$_.ResourceType -eq "Microsoft.Compute/virtualMachineScaleSets" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
