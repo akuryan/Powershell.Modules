@@ -32,9 +32,11 @@ Module could be used as is, installed as [Nuget package](), could be installed a
 ### As is
 
 ```powershell
-Import-Module azure-costs-saver.psm1
+Import-Module .\azure-costs-saver.psm1
 Set-ResourceSizesForCostsSaving -ResourceGroupName $rgName -Downscale ($true|$false) -executionEnv manual
 ```
+
+Do not forget to login :) to Azure 
 
 ### VSTS extension
 

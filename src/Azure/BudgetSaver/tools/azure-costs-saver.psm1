@@ -9,14 +9,14 @@ function WriteLogToHost {
 
 function ProcessWebApps {
     param (
-        $webApps,
+        $webAppFarms,
         $logStringFormat,
         $ResourceGroupName
         )
 
     $whatsProcessing = "Web app farms"
     Write-Host "Processing $whatsProcessing"
-    $amount = ($webApps | Measure-Object).Count
+    $amount = ($webAppFarms | Measure-Object).Count
     if ($amount -le 0) {
         $messageToLog = "No {0} was retrieved for {1}" -f $whatsProcessing, $ResourceGroupName;
         WriteLogToHost -logMessage $messageToLog -logFormat $logStringFormat
@@ -24,63 +24,107 @@ function ProcessWebApps {
     }
 
     #hash is needed to get correct worker size
-    $webAppHashSizes = @{}
-    $webAppHashSizes['1'] = "Small"
-    $webAppHashSizes['2'] = "Medium"
-    $webAppHashSizes['3'] = "Large"
-    $webAppHashSizes['4'] = "Extra Large"
-
+    $webAppHashSizes = @{};
+    $webAppHashSizes['1'] = "Small";
+    $webAppHashSizes['2'] = "Medium";
+    $webAppHashSizes['3'] = "Large";
+    $webAppHashSizes['4'] = "Extra Large";
     Write-Host "There is $amount $whatsProcessing to be processed."
 
-    foreach ($farm in $webApps) {
+    foreach ($farm in $webAppFarms) {
         $resourceId = $farm.ResourceId
         $webFarmResource = Get-AzureRmResource -ResourceId $resourceId -ExpandProperties
         $resourceName = $webFarmResource.Name
         Write-Host "Performing requested operation on $resourceName"
         #get existing tags
         $tags = $webFarmResource.Tags
-        if ($tags.Count -eq 0)
-        {
+        if ($tags.Count -eq 0) {
             #there is no tags defined
             $tags = @{}
+        } else {
+            if ($tags.ContainsKey('costsSaverTier')) {
+                #do a cleanup of previous cost saver tags
+                $tags.Remove('costsSaverTier');
+                $tags.Remove('costsSaverWorkerSize');
+                $tags.Remove('costsSaverNumberofWorkers');
+            }
         }
 
         #we do not want to upscale those slots to Standard :)
-        $excludedTiers = "Free","Shared","Basic"
+        $excludedTiers = "Free","Shared";
         #if installed AzureRm is v.2 - we shall exclude PremiumV2 as well (it is not supported there)
-        $azureRMModules = Get-Module -Name AzureRM -ListAvailable | Select-Object Version | Format-Table | Out-String
+        $azureRMModules = Get-Module -Name AzureRM -ListAvailable | Select-Object Version | Format-Table | Out-String;
         Write-Verbose "Azure RM Modules: $azureRMModules";
         if($azureRMModules -match "2") {
             #we have azureRMModules version 2 - PremiumV2 is not supported here
-            $excludedTiers += "PremiumV2"
+            $excludedTiers += "PremiumV2";
         }
-        Write-Verbose "Excluded tiers: $excludedTiers"
+        Write-Verbose "Excluded tiers: $excludedTiers";
 
         if ($Downscale) {
-            #we need to store current web app sizes in tags
-            $tags.costsSaverTier = $webFarmResource.Sku.tier
-            $tags.costsSaverNumberofWorkers = $webFarmResource.Sku.capacity
-            #from time to time - workerSize returns as Default
-            $tags.costsSaverWorkerSize = $webAppHashSizes[$webFarmResource.Sku.size.Substring(1,1)]
+            #we need to store current web app sizes in tag
+            #tag stores Sku Name, Tier, Size, Family and Capacity splitted by colon
+            $tags.costsSaver = ("{0}:{1}:{2}:{3}:{4}:{5}" -f $webFarmResource.Sku.name, $webFarmResource.Sku.tier, $webFarmResource.Sku.size, $webFarmResource.Sku.family, $webFarmResource.Sku.capacity, $webAppHashSizes[$webFarmResource.Sku.size.Substring(1,1)]);
             #write tags to web app
             Set-AzureRmResource -ResourceId $resourceId -Tag $tags -Force
             (Get-AzureRmResource -ResourceId $resourceId).Tags
 
             #we shall proceed only if we are in more expensive tiers
             if ($excludedTiers -notcontains $webFarmResource.Sku.tier) {
-				#If web app have slots - it could not be downscaled to Basic :(
-                Write-Host "Downscaling $resourceName to tier: Standard, workerSize: Small and 1 worker"
-                Set-AzureRmAppServicePlan -Tier Standard -NumberofWorkers 1 -WorkerSize Small -ResourceGroupName $webFarmResource.ResourceGroupName -Name $webFarmResource.Name
+                #get app service plan rich data
+                $aspEnriched = Get-AzureRmAppServicePlan -ResourceGroupName $webFarmResource.ResourceGroupName -Name $webFarmResource.Name;
+                #get all apps assigned to ASP
+                $apps = Get-AzureRmWebApp -AppServicePlan $aspEnriched;
+
+                $slots = @();
+                #traverse each app to check, if it actually have a slot assigned
+                foreach ($app in $apps) {
+                    $appName = $app.Name;
+                    $appRg = $app.ResourceGroup;
+                    Write-Verbose "Trying to get slot for $appName in resource group $appRg";
+                    #If web app have slots - it could not be downscaled to Basic :(
+                    #test for presence of slot
+                    $slot = Get-AzureRmWebAppSlot -ResourceGroupName $appRg -name $appName;
+                    #not very mem-effective; but list will always create additional element, even if it is empty :(
+                    $slots += $slot;
+                }
+
+                #if in $slots array we have something - that one of web apps, assigned to web farm have deployment slot
+                $slotIsPresent = ($slots.Count -ne 0);
+                Write-Verbose "Do app service plan $resourceName have slot assigned: $slotIsPresent";
+
+                if ($slotIsPresent) {
+                    Write-Host "Downscaling $resourceName to tier: Standard, workerSize: Small and 1 worker"
+                    Set-AzureRmAppServicePlan -Tier Standard -NumberofWorkers 1 -WorkerSize Small -ResourceGroupName $webFarmResource.ResourceGroupName -Name $webFarmResource.Name
+                } else {
+                    Write-Host "Downscaling $resourceName to tier: Basic, workerSize: Small and 1 worker"
+                    Set-AzureRmAppServicePlan -Tier Basic -NumberofWorkers 1 -WorkerSize Small -ResourceGroupName $webFarmResource.ResourceGroupName -Name $webFarmResource.Name
+                }
             }
         }
         else {
-            if ($excludedTiers -notcontains $tags.costsSaverTier) {
-                #we shall not try to set resource
-                $targetTier = $tags.costsSaverTier
-                $targetWorkerSize = $tags.costsSaverWorkerSize
-                $targetAmountOfWorkers = $tags.costsSaverNumberofWorkers
-                Write-Host "Upscaling $resourceName to tier: $targetTier, workerSize: $targetWorkerSize with $targetAmountOfWorkers workers"
-                Set-AzureRmAppServicePlan -Tier $tags.costsSaverTier -NumberofWorkers $tags.costsSaverNumberofWorkers -WorkerSize $tags.costsSaverWorkerSize -ResourceGroupName $webFarmResource.ResourceGroupName -Name $webFarmResource.Name
+            #parse resuls
+            if (-not $tags.ContainsKey("costsSaver")) {
+                $messageToLog = "Tags does not have any costs saver related values. Returning...";
+                WriteLogToHost -logMessage $messageToLog -logFormat $logStringFormat
+                continue;
+            }
+            $collection = $tags.costsSaver.Split(":");
+            if (-not $collection.Length -eq 6) {
+                $messageToLog = "Tag costsSaver does not contains all required data to restore web farm {0} to previous state" -f $resourceName;
+                WriteLogToHost -logMessage $messageToLog -logFormat $logStringFormat
+                continue;
+            }
+            $skuName = $collection[0];
+            $targetTier = $collection[1];
+            $targetWorkerSize = $collection[2];
+            $skuFamily = $collection[3];
+            $targetAmountOfWorkers = $collection[4];
+            $verbSize = $collection[5];
+
+            if ($excludedTiers -notcontains $targetTier) {
+                Write-Host "Upscaling $resourceName to tier: $targetTier, workerSize: $targetWorkerSize with $targetAmountOfWorkers workers";
+                Set-AzureRmAppServicePlan -Tier $targetTier -NumberofWorkers $targetAmountOfWorkers -WorkerSize $verbSize -ResourceGroupName $webFarmResource.ResourceGroupName -Name $webFarmResource.Name;
             }
         }
     }
@@ -329,7 +373,7 @@ function Set-ResourceSizesForCostsSaving {
         Exit $false
     }
 
-    ProcessWebApps -webApps $resources.where( {$_.ResourceType -eq "Microsoft.Web/serverFarms" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
+    ProcessWebApps -webAppFarms $resources.where( {$_.ResourceType -eq "Microsoft.Web/serverFarms" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
     ProcessSqlDatabases -sqlServers $resources.where( {$_.ResourceType -eq "Microsoft.Sql/servers" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
     ProcessVirtualMachines -vms $resources.where( {$_.ResourceType -eq "Microsoft.Compute/virtualMachines" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
     ProcessVirtualMachinesScaleSets -vmScaleSets $resources.where( {$_.ResourceType -eq "Microsoft.Compute/virtualMachineScaleSets" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
