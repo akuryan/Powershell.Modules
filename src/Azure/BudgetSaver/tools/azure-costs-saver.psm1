@@ -24,12 +24,11 @@ function ProcessWebApps {
     }
 
     #hash is needed to get correct worker size
-    $webAppHashSizes = @{}
-    $webAppHashSizes['1'] = "Small"
-    $webAppHashSizes['2'] = "Medium"
-    $webAppHashSizes['3'] = "Large"
-    $webAppHashSizes['4'] = "Extra Large"
-
+    $webAppHashSizes = @{};
+    $webAppHashSizes['1'] = "Small";
+    $webAppHashSizes['2'] = "Medium";
+    $webAppHashSizes['3'] = "Large";
+    $webAppHashSizes['4'] = "Extra Large";
     Write-Host "There is $amount $whatsProcessing to be processed."
 
     foreach ($farm in $webAppFarms) {
@@ -39,29 +38,33 @@ function ProcessWebApps {
         Write-Host "Performing requested operation on $resourceName"
         #get existing tags
         $tags = $webFarmResource.Tags
-        if ($tags.Count -eq 0)
-        {
+        if ($tags.Count -eq 0) {
             #there is no tags defined
             $tags = @{}
+        } else {
+            if ($tags.ContainsKey('costsSaverTier') {
+                #do a cleanup of previous cost saver tags
+                $tags.Remove('costsSaverTier');
+                $tags.Remove('costsSaverWorkerSize');
+                $tags.Remove('costsSaverNumberofWorkers');
+            }
         }
 
         #we do not want to upscale those slots to Standard :)
-        $excludedTiers = "Free","Shared"
+        $excludedTiers = "Free","Shared";
         #if installed AzureRm is v.2 - we shall exclude PremiumV2 as well (it is not supported there)
-        $azureRMModules = Get-Module -Name AzureRM -ListAvailable | Select-Object Version | Format-Table | Out-String
+        $azureRMModules = Get-Module -Name AzureRM -ListAvailable | Select-Object Version | Format-Table | Out-String;
         Write-Verbose "Azure RM Modules: $azureRMModules";
         if($azureRMModules -match "2") {
             #we have azureRMModules version 2 - PremiumV2 is not supported here
-            $excludedTiers += "PremiumV2"
+            $excludedTiers += "PremiumV2";
         }
-        Write-Verbose "Excluded tiers: $excludedTiers"
+        Write-Verbose "Excluded tiers: $excludedTiers";
 
         if ($Downscale) {
-            #we need to store current web app sizes in tags
-            $tags.costsSaverTier = $webFarmResource.Sku.tier
-            $tags.costsSaverNumberofWorkers = $webFarmResource.Sku.capacity
-            #from time to time - workerSize returns as Default
-            $tags.costsSaverWorkerSize = $webAppHashSizes[$webFarmResource.Sku.size.Substring(1,1)]
+            #we need to store current web app sizes in tag
+            #tag stores Sku Name, Tier, Size, Family and Capacity splitted by colon
+            $tags.costsSaver = ("{0}:{1}:{2}:{3}:{4}:{5}" -f $webFarmResource.Sku.name, $webFarmResource.Sku.tier, $webFarmResource.Sku.size, $webFarmResource.Sku.family, $webFarmResource.Sku.capacity, $webAppHashSizes[$webFarmResource.Sku.size.Substring(1,1)]);
             #write tags to web app
             Set-AzureRmResource -ResourceId $resourceId -Tag $tags -Force
             (Get-AzureRmResource -ResourceId $resourceId).Tags
@@ -102,13 +105,28 @@ function ProcessWebApps {
             }
         }
         else {
-            if ($excludedTiers -notcontains $tags.costsSaverTier) {
-                #we shall not try to set resource
-                $targetTier = $tags.costsSaverTier
-                $targetWorkerSize = $tags.costsSaverWorkerSize
-                $targetAmountOfWorkers = $tags.costsSaverNumberofWorkers
-                Write-Host "Upscaling $resourceName to tier: $targetTier, workerSize: $targetWorkerSize with $targetAmountOfWorkers workers"
-                Set-AzureRmAppServicePlan -Tier $tags.costsSaverTier -NumberofWorkers $tags.costsSaverNumberofWorkers -WorkerSize $tags.costsSaverWorkerSize -ResourceGroupName $webFarmResource.ResourceGroupName -Name $webFarmResource.Name
+            #parse resuls
+            if (-not $tags.ContainsKey("costsSaver") {
+                $messageToLog = "Tags does not have any costs saver related values. Returning...";
+                WriteLogToHost -logMessage $messageToLog -logFormat $logStringFormat
+                continue;
+            }
+            $collection = $tags.costsSaver.Split(":");
+            if (-not $collection.Length -eq 6) {
+                $messageToLog = "Tag costsSaver does not contains all required data to restore web farm {0} to previous state" -f $resourceName;
+                WriteLogToHost -logMessage $messageToLog -logFormat $logStringFormat
+                continue;
+            }
+            $skuName = $collection[0];
+            $targetTier = $collection[1];
+            $targetWorkerSize = $collection[2];
+            $skuFamily = $collection[3];
+            $targetAmountOfWorkers = $collection[4];
+            $verbSize = $collection[5];
+
+            if ($excludedTiers -notcontains $targetTier) {
+                Write-Host "Upscaling $resourceName to tier: $targetTier, workerSize: $targetWorkerSize with $targetAmountOfWorkers workers";
+                Set-AzureRmAppServicePlan -Tier $targetTier -NumberofWorkers $targetAmountOfWorkers -WorkerSize $verbSize -ResourceGroupName $webFarmResource.ResourceGroupName -Name $webFarmResource.Name;
             }
         }
     }
