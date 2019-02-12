@@ -85,8 +85,6 @@ function ProcessWebApps {
                     #If web app have slots - it could not be downscaled to Basic :(
                     #test for presence of slot
                     $slot = Get-AzureRmWebAppSlot -ResourceGroupName $appRg -name $appName;
-                    Write-Verbose "Slot value:";
-                    Write-Verbose $slot;
                     #not very mem-effective; but list will always create additional element, even if it is empty :(
                     $slots += $slot;
                 }
