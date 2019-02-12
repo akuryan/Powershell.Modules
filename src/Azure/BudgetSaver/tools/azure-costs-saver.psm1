@@ -42,7 +42,7 @@ function ProcessWebApps {
             #there is no tags defined
             $tags = @{}
         } else {
-            if ($tags.ContainsKey('costsSaverTier') {
+            if ($tags.ContainsKey('costsSaverTier')) {
                 #do a cleanup of previous cost saver tags
                 $tags.Remove('costsSaverTier');
                 $tags.Remove('costsSaverWorkerSize');
@@ -106,7 +106,7 @@ function ProcessWebApps {
         }
         else {
             #parse resuls
-            if (-not $tags.ContainsKey("costsSaver") {
+            if (-not $tags.ContainsKey("costsSaver")) {
                 $messageToLog = "Tags does not have any costs saver related values. Returning...";
                 WriteLogToHost -logMessage $messageToLog -logFormat $logStringFormat
                 continue;
