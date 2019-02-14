@@ -31,7 +31,7 @@ function RetryCommand {
                 $ScriptBlock.Invoke();
                 return;
             } catch {
-                Write-Error $_.Exception.InnerException.Message -ErrorAction Continue;
+                Write-Verbose $_.Exception.InnerException.Message;
                 Start-Sleep $sleepInSeconds;
             }
         } while ($cnt -lt $Maximum)
