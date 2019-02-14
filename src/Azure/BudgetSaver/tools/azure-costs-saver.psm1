@@ -7,6 +7,41 @@ function WriteLogToHost {
     Write-Host $message;
 }
 
+function RetryCommand {
+    [CmdletBinding()]
+    Param(
+        [Parameter(Position=0, Mandatory=$true)]
+        [scriptblock]$ScriptBlock,
+
+        [Parameter(Position=1, Mandatory=$false)]
+        [int]$Maximum = 5,
+
+        [Parameter(Position=2, Mandatory=$false)]
+        [int]$sleepInSeconds = 5
+    )
+
+    Begin {
+        $cnt = 0
+    }
+
+    Process {
+        do {
+            $cnt++
+            try {
+                $ScriptBlock.Invoke();
+                return;
+            } catch {
+                Write-Verbose $_.Exception.InnerException.Message;
+                Start-Sleep $sleepInSeconds;
+            }
+        } while ($cnt -lt $Maximum)
+
+        # Throw an error after $Maximum unsuccessful invocations. Doesn't need
+        # a condition, since the function returns upon successful invocation.
+        throw 'Execution failed.'
+    }
+}
+
 function ProcessWebApps {
     param (
         $webAppFarms,
@@ -217,62 +252,25 @@ function ProcessSqlDatabases {
             }
 
             $databaseSizesSkuEditions = $dbNameSkuEditionInfoString.Split(';');
-        }
-
-        foreach ($sqlDb in $sqlDatabases.where( {$_.DatabaseName -ne "master"}))
-        {
-            $resourceName = $sqlDb.DatabaseName
-
-            Write-Host "Performing requested operation on $resourceName"
-            $resourceId = $sqlDb.ResourceId
-
-            $keySku = ("{0}-{1}" -f $resourceName, "sku");
-            $keyEdition = ("{0}-{1}" -f $resourceName, "edition");
-            #removing possibly existing old tags
-            $sqlServerTags.Remove($keySku);
-            $sqlServerTags.Remove($keyEdition);
-
-            if ($Downscale) {
-                #proceed only in case we are not on Basic
-                if ($sqlDb.Edition -ne "Basic")
-                {
-                    #proceed only in case we are not at S0
+        } else {
+            #collect sizes and save tags
+            foreach ($sqlDb in $sqlDatabases.where( {$_.DatabaseName -ne "master"})) {
+                $resourceName = $sqlDb.DatabaseName;
+                $keySku = ("{0}-{1}" -f $resourceName, "sku");
+                $keyEdition = ("{0}-{1}" -f $resourceName, "edition");
+                #removing possibly existing old tags
+                $sqlServerTags.Remove($keySku);
+                $sqlServerTags.Remove($keyEdition);
+                if ($sqlDb.Edition -ne "Basic") {
                     if ($sqlDb.CurrentServiceObjectiveName -ne "S0") {
                         #store it as dbName:sku-edition
                         Write-Verbose "dbNameSkuEditionInfoString now is $dbNameSkuEditionInfoString";
                         $dbNameSkuEditionInfoString = $dbNameSkuEditionInfoString + ("{0}:{1}-{2};" -f $resourceName, $sqlDb.CurrentServiceObjectiveName, $sqlDb.Edition );
                         Write-Verbose "dbNameSkuEditionInfoString became now $dbNameSkuEditionInfoString";
-                        Write-Host "Downscaling $resourceName at server $sqlServerName to S0 size";
-                        Set-AzureRmSqlDatabase -DatabaseName $resourceName -ResourceGroupName $sqlDb.ResourceGroupName -ServerName $sqlServerName -RequestedServiceObjectiveName S0 -Edition Standard;
-                    } else {
-                        Write-Verbose "We do not need to downscale db $resourceName at server $sqlServerName to S0 size";
-                    }
-                }
-            } else {
-                $filterOn = ("{0}:*" -f $resourceName);
-                Write-Verbose "We are going to filter $dbNameSkuEditionInfoString with filter $filterOn";
-                $replaceString = ("{0}:" -f $resourceName);
-                #get DB size and edition
-                $skuEdition = ($databaseSizesSkuEditions -like $filterOn);
-                Write-Verbose "We've found sku and edition for $resourceName - it is $skuEdition";
-                #ugly, a lot of branching, but could not think of any way
-                if (![string]::IsNullOrWhiteSpace($skuEdition)) {
-                    $skuEdition = $skuEdition.Replace($replaceString, "");
-                    Write-Verbose "We've replaced and final sku and edition is $skuEdition";
-                    #we have SkuEdition defined for database, which means that it was not Basic or Standard S0 prior to downscaling
-                    if ($skuEdition.Split('-').Count -eq 2)
-                    {
-                        #we have exactly 2 values in our tag and could proceed further
-                        $edition = $skuEdition.Split('-')[1];
-                        $targetSize = $skuEdition.Split('-')[0];
-                        #since we could not have tags about Basic and Standard S0 databases - we are going to proceed from here
-                        Write-Host "Upscaling $resourceName at server $sqlServerName to $targetSize size"
-                        Set-AzureRmSqlDatabase -DatabaseName $resourceName -ResourceGroupName $sqlDb.ResourceGroupName -ServerName $sqlServerName -RequestedServiceObjectiveName $targetSize -Edition $edition
                     }
                 }
             }
-        }
-        if ($Downscale) {
+
             #now we need to form up tags (tag have a limit of 256 chars per tag)
             $stringLength = $dbNameSkuEditionInfoString.Length;
             Write-Verbose "dbNameSkuEditionInfoString have lenght of $stringLength"
@@ -301,6 +299,55 @@ function ProcessSqlDatabases {
             #Store tags on SQL server
             Set-AzureRmResource -ResourceId $sqlServerResourceId -Tag $sqlServerTags -Force
             (Get-AzureRmResource -ResourceId $sqlServerResourceId).Tags
+        }
+
+        foreach ($sqlDb in $sqlDatabases.where( {$_.DatabaseName -ne "master"}))
+        {
+            $resourceName = $sqlDb.DatabaseName
+
+            Write-Host "Performing requested operation on $resourceName"
+            $resourceId = $sqlDb.ResourceId;
+
+            if ($Downscale) {
+                #proceed only in case we are not on Basic
+                if ($sqlDb.Edition -ne "Basic") {
+                    #proceed only in case we are not at S0
+                    if ($sqlDb.CurrentServiceObjectiveName -ne "S0") {
+                        Write-Host "Downscaling $resourceName at server $sqlServerName to S0 size";
+                        RetryCommand -ScriptBlock {
+                            Set-AzureRmSqlDatabase -DatabaseName $resourceName -ResourceGroupName $sqlDb.ResourceGroupName -ServerName $sqlServerName -RequestedServiceObjectiveName S0 -Edition Standard;
+                        }
+                    } else {
+                        Write-Verbose "We do not need to downscale db $resourceName at server $sqlServerName to S0 size";
+                    }
+                } else {
+                    Write-Verbose "We do not need to downscale db $resourceName at server $sqlServerName to S0 size as it is Basic already";
+                }
+            } else {
+                $filterOn = ("{0}:*" -f $resourceName);
+                Write-Verbose "We are going to filter $dbNameSkuEditionInfoString with filter $filterOn";
+                $replaceString = ("{0}:" -f $resourceName);
+                #get DB size and edition
+                $skuEdition = ($databaseSizesSkuEditions -like $filterOn);
+                Write-Verbose "We've found sku and edition for $resourceName - it is $skuEdition";
+                #ugly, a lot of branching, but could not think of any way
+                if (![string]::IsNullOrWhiteSpace($skuEdition)) {
+                    $skuEdition = $skuEdition.Replace($replaceString, "");
+                    Write-Verbose "We've replaced and final sku and edition is $skuEdition";
+                    #we have SkuEdition defined for database, which means that it was not Basic or Standard S0 prior to downscaling
+                    if ($skuEdition.Split('-').Count -eq 2)
+                    {
+                        #we have exactly 2 values in our tag and could proceed further
+                        $edition = $skuEdition.Split('-')[1];
+                        $targetSize = $skuEdition.Split('-')[0];
+                        #since we could not have tags about Basic and Standard S0 databases - we are going to proceed from here
+                        Write-Host "Upscaling $resourceName at server $sqlServerName to $targetSize size"
+                        RetryCommand -ScriptBlock {
+                            Set-AzureRmSqlDatabase -DatabaseName $resourceName -ResourceGroupName $sqlDb.ResourceGroupName -ServerName $sqlServerName -RequestedServiceObjectiveName $targetSize -Edition $edition
+                        }
+                    }
+                }
+            }
         }
     }
 }
