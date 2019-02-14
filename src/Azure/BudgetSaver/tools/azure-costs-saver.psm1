@@ -7,6 +7,41 @@ function WriteLogToHost {
     Write-Host $message;
 }
 
+function RetryCommand {
+    [CmdletBinding()]
+    Param(
+        [Parameter(Position=0, Mandatory=$true)]
+        [scriptblock]$ScriptBlock,
+
+        [Parameter(Position=1, Mandatory=$false)]
+        [int]$Maximum = 5,
+
+        [Parameter(Position=2, Mandatory=$false)]
+        [int]$sleepInSeconds = 5
+    )
+
+    Begin {
+        $cnt = 0
+    }
+
+    Process {
+        do {
+            $cnt++
+            try {
+                $ScriptBlock.Invoke();
+                return;
+            } catch {
+                Write-Error $_.Exception.InnerException.Message -ErrorAction Continue;
+                Start-Sleep $sleepInSeconds;
+            }
+        } while ($cnt -lt $Maximum)
+
+        # Throw an error after $Maximum unsuccessful invocations. Doesn't need
+        # a condition, since the function returns upon successful invocation.
+        throw 'Execution failed.'
+    }
+}
+
 function ProcessWebApps {
     param (
         $webAppFarms,
@@ -279,7 +314,9 @@ function ProcessSqlDatabases {
                     #proceed only in case we are not at S0
                     if ($sqlDb.CurrentServiceObjectiveName -ne "S0") {
                         Write-Host "Downscaling $resourceName at server $sqlServerName to S0 size";
-                        Set-AzureRmSqlDatabase -DatabaseName $resourceName -ResourceGroupName $sqlDb.ResourceGroupName -ServerName $sqlServerName -RequestedServiceObjectiveName S0 -Edition Standard;
+                        RetryCommand -ScriptBlock {
+                            Set-AzureRmSqlDatabase -DatabaseName $resourceName -ResourceGroupName $sqlDb.ResourceGroupName -ServerName $sqlServerName -RequestedServiceObjectiveName S0 -Edition Standard;
+                        }
                     } else {
                         Write-Verbose "We do not need to downscale db $resourceName at server $sqlServerName to S0 size";
                     }
@@ -305,7 +342,9 @@ function ProcessSqlDatabases {
                         $targetSize = $skuEdition.Split('-')[0];
                         #since we could not have tags about Basic and Standard S0 databases - we are going to proceed from here
                         Write-Host "Upscaling $resourceName at server $sqlServerName to $targetSize size"
-                        Set-AzureRmSqlDatabase -DatabaseName $resourceName -ResourceGroupName $sqlDb.ResourceGroupName -ServerName $sqlServerName -RequestedServiceObjectiveName $targetSize -Edition $edition
+                        RetryCommand -ScriptBlock {
+                            Set-AzureRmSqlDatabase -DatabaseName $resourceName -ResourceGroupName $sqlDb.ResourceGroupName -ServerName $sqlServerName -RequestedServiceObjectiveName $targetSize -Edition $edition
+                        }
                     }
                 }
             }
