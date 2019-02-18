@@ -88,7 +88,7 @@ function ProcessWebApps {
         #we do not want to upscale those slots to Standard :)
         $excludedTiers = "Free","Shared";
         #if installed AzureRm is v.2 - we shall exclude PremiumV2 as well (it is not supported there)
-        $azureRMModules = Get-Module -Name AzureRM -ListAvailable | Select-Object Version | Format-Table | Out-String;
+        $azureRMModules = Get-Module -Name AzureRM | Select-Object Version | Format-Table | Out-String;
         Write-Verbose "Azure RM Modules: $azureRMModules";
         if($azureRMModules -match "2") {
             #we have azureRMModules version 2 - PremiumV2 is not supported here
