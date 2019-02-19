@@ -256,11 +256,16 @@ function ProcessSqlDatabases {
             #collect sizes and save tags
             foreach ($sqlDb in $sqlDatabases.where( {$_.DatabaseName -ne "master"})) {
                 $resourceName = $sqlDb.DatabaseName;
+                #removing possibly existing old tags, maybe get rid of it by version 2 of nuget :)
                 $keySku = ("{0}-{1}" -f $resourceName, "sku");
                 $keyEdition = ("{0}-{1}" -f $resourceName, "edition");
-                #removing possibly existing old tags
-                $sqlServerTags.Remove($keySku);
-                $sqlServerTags.Remove($keyEdition);
+                if ($sqlServerTags.ContainsKey($keySku)) {
+                    $sqlServerTags.Remove($keySku);
+                }
+                if ($sqlServerTags.ContainsKey($keyEdition)) {
+                    $sqlServerTags.Remove($keyEdition);
+                }
+
                 if ($sqlDb.Edition -ne "Basic") {
                     if ($sqlDb.CurrentServiceObjectiveName -ne "S0") {
                         #store it as dbName:sku-edition
