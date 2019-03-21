@@ -42,4 +42,4 @@ See [VSTS marketplace](https://marketplace.visualstudio.com/items?itemName=anton
 
 ### Teamcity metarunner
 
-To be written
+See [repository](https://github.com/akuryan/Teamcity.Metarunners/tree/master/Clouds/Azure/AzureCostsSaver)
