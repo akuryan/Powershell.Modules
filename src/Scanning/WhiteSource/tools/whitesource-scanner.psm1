@@ -24,8 +24,19 @@ function DownloadDataWithCheckForStaleness {
         $webClient = New-Object System.Net.WebClient;
         $webClient.DownloadFile($urlToDownload, $filePath);
     }
+}
 
-    return $downloadRequired;
+function ReplaceVariables {
+    param (
+        [string]$config,
+        [string]$variableName,
+        [string]$variableValue
+    )
+    
+    $regExp = "(#)?" + $variableName + "=(.*)";
+    $replacement = $variableName + "=" + $variableValue;
+    $configAltered = $config -replace $regExp, $replacement;
+    return $configAltered;
 }
 
 
@@ -35,20 +46,46 @@ function Scan-Sources {
         [string]$AgentPath = "$env:temp/wss-unified-agent.jar",
         [Parameter(Mandatory=$true)]
         [string]$ProjectName,
-        [Parameter(ParameterSetName="ConfigExists")]
-        [bool]$WssConfigurationExists = $false,
-        [Parameter(ParameterSetName="ConfigExists", Mandatory=$true)]
-        [string]$WssConfigurationPath
+        [string]$WssConfigurationPath,
+        [string]$ExcludeFoldersFromScan,
+        [Parameter(Mandatory=$true)]
+        [string]$Version,
+        [string]$FileScanPattern,
+        [Parameter(Mandatory=$true)]
+        [string]$WssApiKey,
+        [Parameter(Mandatory=$true)]
+        [string]$ScanPath
     )
 
     DownloadDataWithCheckForStaleness -forceDownload $ForceDownload -filePath $AgentPath -urlToDownload "https://github.com/whitesource/unified-agent-distribution/raw/master/standAlone/wss-unified-agent.jar";
 
-    $configWasDownloaded = $true;
-
+    $WssConfigurationExists = $true;
+    if (![string]::IsNullOrWhiteSpace($WssConfigurationPath)) {
+        $WssConfigurationExists = Test-Path $WssConfigurationPath;
+    } else {
+        $WssConfigurationExists = $false;
+    }
+    
     if (!$WssConfigurationExists) {
         $WssConfigurationPath = "$env:temp/$ProjectName/wss-unified-agent.config";
-        $configWasDownloaded = DownloadDataWithCheckForStaleness -forceDownload $false -filePath $WssConfigurationPath -urlToDownload "https://github.com/whitesource/unified-agent-distribution/raw/master/standAlone/wss-unified-agent.config"
+        DownloadDataWithCheckForStaleness -forceDownload $false -filePath $WssConfigurationPath -urlToDownload "https://github.com/whitesource/unified-agent-distribution/raw/master/standAlone/wss-unified-agent.config";
+
+        $config = Get-Content -Path $WssConfigurationPath;
+
+        if (![string]::IsNullOrWhiteSpace($ExcludeFoldersFromScan)) {
+            $config = ReplaceVariables -config $config -variableName "projectPerFolderExcludes" -variableValue $ExcludeFoldersFromScan;
+        }
+        if (![string]::IsNullOrWhiteSpace($FileScanPattern)) {
+            ReplaceVariables -config $config -variableName "includes" -variableValue $FileScanPattern;
+        }
+        ReplaceVariables -config $config -variableName "projectVersion" -variableValue $Version;
+        ReplaceVariables -config $config -variableName "productVersion" -variableValue $Version;
+
+        ReplaceVariables -config $config -variableName "projectName" -variableValue $ProjectName;
+        ReplaceVariables -config $config -variableName "productName" -variableValue $ProjectName;
+
+        Set-Content -Path $WssConfigurationPath -Value $config;
     }
 
-    
+    java -jar whitesource-fs-agent.jar -apiKey $WssApiKey -c $WssConfigurationPath -d $ScanPath
 }

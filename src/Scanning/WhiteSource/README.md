@@ -14,17 +14,29 @@ Script expects that you have Java installed on your system already.
 
 ```ProjectName``` - defines project name, as will be seen in WhiteSource Dashboard
 
+```Version``` - version to be sent to WhiteSource. Marked as mandatory, as you shall bump it up every scan.
+
+```WssApiKey``` - API key for WhiteSource
+
+```ScanPath``` - Root path to start scanning for
+
 #### Set by default
 
 ```ForceDownload``` - defines, if we need to redownload scanner file, even if it present and not stale (less than 15 days). Default value is ```$false```.
 
 ```AgentPath``` - defines, where whitesource agent shall be downloaded for further execution. Default value is temporary folder.
 
-```WssConfigurationExists``` - boolean value which defines, if WSS configuration is stored within repository. Default valus is ```$false```. If set to ```$true``` - need to define path WSS configuration
+#### Optional
+
+```ExcludeFoldersFromScan``` - Comma or space separated list of Ant-style GLOB patterns specifying which folders to exclude in the scan
+
+```FileScanPattern``` - Comma, space or line separated list of Ant-style GLOB patterns specifying which files to include in the scan. 
+
+```WssConfigurationPath``` - Specify path to config file for WhiteSource analyzer. If not specified - it will be downloaded
 
 ### As is
 
 ```powershell
 Import-Module .\whitesource-scanner.psm1
-Scan-Sources 
+Scan-Sources -ProjectName "youProjectName" -Version "x.x.x.x" -FileScanPattern "**/*.cs **/*.js **/*.scss **/*.jsx **/*.cxx **/*.c++ **/*.h **/*.hpp **/*.hxx" -WssApiKey "youWhiteSourceApiKey" -ScanPath "youProjectRootFolder"
 ```
