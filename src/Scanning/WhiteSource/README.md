@@ -12,8 +12,6 @@ Script expects that you have Java installed on your system already.
 
 #### Mandatory
 
-```ProjectName``` - defines project name, as will be seen in WhiteSource Dashboard
-
 ```Version``` - version to be sent to WhiteSource. Marked as mandatory, as you shall bump it up every scan.
 
 ```WssApiKey``` - API key for WhiteSource
@@ -33,6 +31,8 @@ Script expects that you have Java installed on your system already.
 ```FileScanPattern``` - Comma, space or line separated list of Ant-style GLOB patterns specifying which files to include in the scan. 
 
 ```WssConfigurationPath``` - Specify path to config file for WhiteSource analyzer. If not specified - it will be downloaded
+
+```ProjectName``` - defines project name, as will be seen in WhiteSource Dashboard (works only if config is not defined)
 
 ### As is
 

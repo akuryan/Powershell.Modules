@@ -43,7 +43,6 @@ function Scan-Sources {
     param (
         [bool]$ForceDownload = $false,
         [string]$AgentPath = "$env:temp/wss-unified-agent.jar",
-        [Parameter(Mandatory=$true)]
         [string]$ProjectName,
         [string]$WssConfigurationPath,
         [string]$ExcludeFoldersFromScan,
