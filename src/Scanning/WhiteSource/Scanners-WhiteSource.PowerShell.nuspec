@@ -11,7 +11,7 @@
     </description>
     <projectUrl>https://github.com/akuryan/Powershell.Modules/tree/master/src/Scanning/WhiteSource</projectUrl>
     <copyright>Copyright 2019</copyright>
-    <tags>powershell, whitesources, scanner</tags>
+    <tags>powershell, whitesource, scanner</tags>
     <language>en-US</language>
   </metadata>
   <files>
