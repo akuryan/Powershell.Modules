@@ -33,10 +33,9 @@ function ReplaceVariables {
         [string]$variableValue
     )
     
-    $regExp = "(#)?" + $variableName + "=(.*)";
+    $regExp = [regex]"(#)?$variableName=(.*)";    
     $replacement = $variableName + "=" + $variableValue;
-    $configAltered = $config -replace $regExp, $replacement;
-    return $configAltered;
+    return $regExp.Replace($config, $replacement, 1);
 }
 
 
@@ -57,6 +56,8 @@ function Scan-Sources {
         [string]$ScanPath
     )
 
+    [Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls";
+
     DownloadDataWithCheckForStaleness -forceDownload $ForceDownload -filePath $AgentPath -urlToDownload "https://github.com/whitesource/unified-agent-distribution/raw/master/standAlone/wss-unified-agent.jar";
 
     $WssConfigurationExists = $true;
@@ -67,25 +68,30 @@ function Scan-Sources {
     }
     
     if (!$WssConfigurationExists) {
-        $WssConfigurationPath = "$env:temp/$ProjectName/wss-unified-agent.config";
+        $wssConfigDirectory = "$env:temp/$ProjectName";
+        $WssConfigurationPath = "$wssConfigDirectory/wss-unified-agent.config";
+        if (!(Test-Path -PathType Container -Path "$wssConfigDirectory")) {
+            New-Item -ItemType Directory -Force -Path $wssConfigDirectory;
+        }
+
         DownloadDataWithCheckForStaleness -forceDownload $false -filePath $WssConfigurationPath -urlToDownload "https://github.com/whitesource/unified-agent-distribution/raw/master/standAlone/wss-unified-agent.config";
 
-        $config = Get-Content -Path $WssConfigurationPath;
+        $config = Get-Content -Path $WssConfigurationPath -Raw;
 
         if (![string]::IsNullOrWhiteSpace($ExcludeFoldersFromScan)) {
             $config = ReplaceVariables -config $config -variableName "projectPerFolderExcludes" -variableValue $ExcludeFoldersFromScan;
         }
         if (![string]::IsNullOrWhiteSpace($FileScanPattern)) {
-            ReplaceVariables -config $config -variableName "includes" -variableValue $FileScanPattern;
+            $config = ReplaceVariables -config $config -variableName "includes" -variableValue $FileScanPattern;
         }
-        ReplaceVariables -config $config -variableName "projectVersion" -variableValue $Version;
-        ReplaceVariables -config $config -variableName "productVersion" -variableValue $Version;
+        $config = ReplaceVariables -config $config -variableName "projectVersion" -variableValue $Version;
+        $config = ReplaceVariables -config $config -variableName "productVersion" -variableValue $Version;
 
-        ReplaceVariables -config $config -variableName "projectName" -variableValue $ProjectName;
-        ReplaceVariables -config $config -variableName "productName" -variableValue $ProjectName;
+        $config = ReplaceVariables -config $config -variableName "projectName" -variableValue $ProjectName;
+        $config = ReplaceVariables -config $config -variableName "productName" -variableValue $ProjectName;
 
         Set-Content -Path $WssConfigurationPath -Value $config;
     }
 
-    java -jar whitesource-fs-agent.jar -apiKey $WssApiKey -c $WssConfigurationPath -d $ScanPath
+    java -jar $AgentPath -apiKey $WssApiKey -c $WssConfigurationPath -d $ScanPath
 }
