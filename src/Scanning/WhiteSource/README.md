@@ -36,7 +36,16 @@ Script expects that you have Java installed on your system already.
 
 ### As is
 
+Without predefined configuration:
+
 ```powershell
 Import-Module .\whitesource-scanner.psm1
-Scan-Sources -ProjectName "youProjectName" -Version "x.x.x.x" -FileScanPattern "**/*.cs **/*.js **/*.scss **/*.jsx **/*.cxx **/*.c++ **/*.h **/*.hpp **/*.hxx" -WssApiKey "youWhiteSourceApiKey" -ScanPath "youProjectRootFolder"
+Scan-Sources -ProjectName "youProjectName" -Version "x.x.x.x" -FileScanPattern "**/*.cs **/*.js **/*.scss **/*.jsx" -WssApiKey "youWhiteSourceApiKey" -ScanPath "youProjectRootFolder"
+```
+
+With predefined configuration:
+
+```powershell
+Import-Module .\whitesource-scanner.psm1
+Scan-Sources -WssApiKey "youWhiteSourceApiKey" -ScanPath "youProjectRootFolder" -Version "x.x.x.x"  -WssConfigurationPath "youWhiteSourceConfigFile"
 ```
