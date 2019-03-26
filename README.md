@@ -4,3 +4,4 @@ Repository for powershell modules used on day-to-day basis in VSTS and Teamcity.
 ## List of modules
 
 * [Azure modules](./src/Azure/README.md)
+* [Scanning modules](./src/Scanning/README.md)

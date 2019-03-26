@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<package>
+  <metadata>
+    <id>Scanners-WhiteSource.PowerShell</id>
+    <version>1.0.0</version>
+    <authors>Anton Kuryan</authors>
+    <owners>Anton Kuryan</owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>
+      Scanners-WhiteSource.PowerShell - powershell module, which could be used to execute WhiteSource scan for your project. Could be used as replacement for https://github.com/whitesource/unified-agent-distribution/blob/master/standAlone/wss_agent.sh
+    </description>
+    <projectUrl>https://github.com/akuryan/Powershell.Modules/tree/master/src/Scanning/WhiteSource</projectUrl>
+    <copyright>Copyright 2019</copyright>
+    <tags>powershell, whitesources, scanner</tags>
+    <language>en-US</language>
+  </metadata>
+  <files>
+    <file src="tools\whitesource-scanner.psm1" target="tools" />
+  </files>
+</package>
