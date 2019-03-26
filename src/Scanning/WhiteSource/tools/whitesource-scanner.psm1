@@ -42,7 +42,7 @@ function ReplaceVariables {
 function Scan-Sources {
     param (
         [bool]$ForceDownload = $false,
-        [string]$AgentPath = "$env:temp/wss-unified-agent.jar",
+        [string]$AgentPath,
         [string]$ProjectName,
         [string]$WssConfigurationPath,
         [string]$ExcludeFoldersFromScan,
@@ -56,6 +56,10 @@ function Scan-Sources {
     )
 
     [Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls";
+
+    if ([string]::IsNullOrWhiteSpace($AgentPath)) {
+        $AgentPath = "$env:temp/wss-unified-agent.jar";
+    }
 
     DownloadDataWithCheckForStaleness -forceDownload $ForceDownload -filePath $AgentPath -urlToDownload "https://github.com/whitesource/unified-agent-distribution/raw/master/standAlone/wss-unified-agent.jar";
 
