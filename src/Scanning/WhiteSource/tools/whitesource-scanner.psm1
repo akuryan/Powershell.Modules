@@ -33,6 +33,10 @@ function ReplaceVariables {
         [string]$variableValue
     )
     
+    if ([string]::IsNullOrWhiteSpace($variableValue)) {
+        return $config;
+    }
+
     $regExp = [regex]"(#)?$variableName=(.*)";    
     $replacement = $variableName + "=" + $variableValue;
     return $regExp.Replace($config, $replacement, 1);
@@ -78,23 +82,23 @@ function Scan-Sources {
         }
 
         DownloadDataWithCheckForStaleness -forceDownload $false -filePath $WssConfigurationPath -urlToDownload "https://github.com/whitesource/unified-agent-distribution/raw/master/standAlone/wss-unified-agent.config";
-
-        $config = Get-Content -Path $WssConfigurationPath -Raw;
-
-        if (![string]::IsNullOrWhiteSpace($ExcludeFoldersFromScan)) {
-            $config = ReplaceVariables -config $config -variableName "projectPerFolderExcludes" -variableValue $ExcludeFoldersFromScan;
-        }
-        if (![string]::IsNullOrWhiteSpace($FileScanPattern)) {
-            $config = ReplaceVariables -config $config -variableName "includes" -variableValue $FileScanPattern;
-        }
-        $config = ReplaceVariables -config $config -variableName "projectVersion" -variableValue $Version;
-        $config = ReplaceVariables -config $config -variableName "productVersion" -variableValue $Version;
-
-        $config = ReplaceVariables -config $config -variableName "projectName" -variableValue $ProjectName;
-        $config = ReplaceVariables -config $config -variableName "productName" -variableValue $ProjectName;
-
-        Set-Content -Path $WssConfigurationPath -Value $config;
     }
+
+    $config = Get-Content -Path $WssConfigurationPath -Raw;
+
+    Write-Verbose "Config before modification:";
+    Write-Verbose $config;
+
+    $config = ReplaceVariables -config $config -variableName "projectPerFolderExcludes" -variableValue $ExcludeFoldersFromScan;
+    $config = ReplaceVariables -config $config -variableName "includes" -variableValue $FileScanPattern;
+    $config = ReplaceVariables -config $config -variableName "projectVersion" -variableValue $Version;
+    $config = ReplaceVariables -config $config -variableName "productVersion" -variableValue $Version;
+    $config = ReplaceVariables -config $config -variableName "projectName" -variableValue $ProjectName;
+    $config = ReplaceVariables -config $config -variableName "productName" -variableValue $ProjectName;
+
+    Write-Verbose "Config after modification:";
+    Write-Verbose $config;
+    Set-Content -Path $WssConfigurationPath -Value $config;
 
     java -jar $AgentPath -apiKey $WssApiKey -c $WssConfigurationPath -d $ScanPath
 }
