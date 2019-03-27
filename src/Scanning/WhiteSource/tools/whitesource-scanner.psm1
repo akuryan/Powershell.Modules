@@ -88,11 +88,14 @@ function Scan-Sources {
     Write-Verbose "Config before modification:";
     Write-Verbose $config;
 
-    $config = ReplaceVariables -config $config -variableName "includes" -variableValue $FileScanPattern;
+    if (!$WssConfigurationExists) {
+        $config = ReplaceVariables -config $config -variableName "includes" -variableValue $FileScanPattern;
+        $config = ReplaceVariables -config $config -variableName "projectName" -variableValue $ProjectName;
+        $config = ReplaceVariables -config $config -variableName "productName" -variableValue $ProjectName;
+    }
+
     $config = ReplaceVariables -config $config -variableName "projectVersion" -variableValue $Version;
     $config = ReplaceVariables -config $config -variableName "productVersion" -variableValue $Version;
-    $config = ReplaceVariables -config $config -variableName "projectName" -variableValue $ProjectName;
-    $config = ReplaceVariables -config $config -variableName "productName" -variableValue $ProjectName;
 
     Write-Verbose "Config after modification:";
     Write-Verbose $config;
