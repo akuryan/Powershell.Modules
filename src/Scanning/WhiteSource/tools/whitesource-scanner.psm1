@@ -49,7 +49,6 @@ function Scan-Sources {
         [string]$AgentPath,
         [string]$ProjectName,
         [string]$WssConfigurationPath,
-        [string]$ExcludeFoldersFromScan,
         [Parameter(Mandatory=$true)]
         [string]$Version,
         [string]$FileScanPattern,
@@ -89,7 +88,6 @@ function Scan-Sources {
     Write-Verbose "Config before modification:";
     Write-Verbose $config;
 
-    $config = ReplaceVariables -config $config -variableName "projectPerFolderExcludes" -variableValue $ExcludeFoldersFromScan;
     $config = ReplaceVariables -config $config -variableName "includes" -variableValue $FileScanPattern;
     $config = ReplaceVariables -config $config -variableName "projectVersion" -variableValue $Version;
     $config = ReplaceVariables -config $config -variableName "productVersion" -variableValue $Version;

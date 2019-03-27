@@ -26,8 +26,6 @@ Script expects that you have Java installed on your system already.
 
 #### Optional
 
-```ExcludeFoldersFromScan``` - Comma or space separated list of Ant-style GLOB patterns specifying which folders to exclude in the scan
-
 ```FileScanPattern``` - Comma, space or line separated list of Ant-style GLOB patterns specifying which files to include in the scan. 
 
 ```WssConfigurationPath``` - Specify path to config file for WhiteSource analyzer. If not specified - it will be downloaded
