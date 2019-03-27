@@ -62,6 +62,11 @@ function Scan-Sources {
 
     if ([string]::IsNullOrWhiteSpace($AgentPath)) {
         $AgentPath = "$env:temp/wss-unified-agent.jar";
+    } else {
+        if (!(Test-Path -PathType Container -Path "$AgentPath")) {
+            New-Item -ItemType Directory -Force -Path $AgentPath;
+        }
+        $AgentPath = "$AgentPath/wss-unified-agent.jar";
     }
 
     DownloadDataWithCheckForStaleness -forceDownload $ForceDownload -filePath $AgentPath -urlToDownload "https://github.com/whitesource/unified-agent-distribution/raw/master/standAlone/wss-unified-agent.jar";
