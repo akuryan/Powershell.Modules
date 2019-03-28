@@ -73,7 +73,7 @@ function Scan-Sources {
 
     $WssConfigurationExists = $true;
     if (![string]::IsNullOrWhiteSpace($WssConfigurationPath)) {
-        $WssConfigurationExists = Test-Path $WssConfigurationPath;
+        $WssConfigurationExists = Test-Path $WssConfigurationPath -PathType Leaf;
     } else {
         $WssConfigurationExists = $false;
     }
