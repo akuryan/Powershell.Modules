@@ -96,6 +96,11 @@ function ProcessWebApps {
         }
         Write-Verbose "Excluded tiers: $excludedTiers";
 
+        #get app service plan rich data
+        $aspEnriched = Get-AzureRmAppServicePlan -ResourceGroupName $webFarmResource.ResourceGroupName -Name $webFarmResource.Name;
+        #get all apps assigned to ASP
+        $apps = Get-AzureRmWebApp -AppServicePlan $aspEnriched;
+
         if ($Downscale) {
             #we need to store current web app sizes in tag
             #tag stores Sku Name, Tier, Size, Family and Capacity splitted by colon
@@ -106,11 +111,6 @@ function ProcessWebApps {
 
             #we shall proceed only if we are in more expensive tiers
             if ($excludedTiers -notcontains $webFarmResource.Sku.tier) {
-                #get app service plan rich data
-                $aspEnriched = Get-AzureRmAppServicePlan -ResourceGroupName $webFarmResource.ResourceGroupName -Name $webFarmResource.Name;
-                #get all apps assigned to ASP
-                $apps = Get-AzureRmWebApp -AppServicePlan $aspEnriched;
-
                 $slots = @();
                 #traverse each app to check, if it actually have a slot assigned
                 foreach ($app in $apps) {
@@ -160,6 +160,10 @@ function ProcessWebApps {
             if ($excludedTiers -notcontains $targetTier) {
                 Write-Host "Upscaling $resourceName to tier: $targetTier, workerSize: $targetWorkerSize with $targetAmountOfWorkers workers";
                 Set-AzureRmAppServicePlan -Tier $targetTier -NumberofWorkers $targetAmountOfWorkers -WorkerSize $verbSize -ResourceGroupName $webFarmResource.ResourceGroupName -Name $webFarmResource.Name;
+                foreach ($app in $apps) {
+                    #sometimes during upscale - app will stall in disabled state (though it is running), so I will restart it here one more time (this fixes problem)
+                    Restart-AzureRmWebApp $app;
+                }
             }
         }
     }
