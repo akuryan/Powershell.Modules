@@ -429,8 +429,13 @@ function Set-ResourceSizesForCostsSaving {
         Exit $false
     }
 
-    ProcessWebApps -webAppFarms $resources.where( {$_.ResourceType -eq "Microsoft.Web/serverFarms" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
-    ProcessSqlDatabases -sqlServers $resources.where( {$_.ResourceType -eq "Microsoft.Sql/servers" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
-    ProcessVirtualMachines -vms $resources.where( {$_.ResourceType -eq "Microsoft.Compute/virtualMachines" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
-    ProcessVirtualMachinesScaleSets -vmScaleSets $resources.where( {$_.ResourceType -eq "Microsoft.Compute/virtualMachineScaleSets" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
+    $webAppFarms = $resources.where( {$_.ResourceType -eq "Microsoft.Web/serverFarms" -And $_.ResourceGroupName -eq "$ResourceGroupName"});
+    $sqlServers = $resources.where( {$_.ResourceType -eq "Microsoft.Sql/servers" -And $_.ResourceGroupName -eq "$ResourceGroupName"});
+    $virtualMachines = $resources.where( {$_.ResourceType -eq "Microsoft.Compute/virtualMachines" -And $_.ResourceGroupName -eq "$ResourceGroupName"});
+    $vmScaleSets = $resources.where( {$_.ResourceType -eq "Microsoft.Compute/virtualMachineScaleSets" -And $_.ResourceGroupName -eq "$ResourceGroupName"});
+
+    ProcessWebApps -webAppFarms $webAppFarms -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
+    ProcessSqlDatabases -sqlServers $sqlServers -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
+    ProcessVirtualMachines -vms $virtualMachines -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
+    ProcessVirtualMachinesScaleSets -vmScaleSets $vmScaleSets -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
 }
