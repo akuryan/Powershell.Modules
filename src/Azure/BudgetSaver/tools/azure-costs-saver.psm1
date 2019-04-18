@@ -403,7 +403,9 @@ function Set-ResourceSizesForCostsSaving {
         #execution environment defines logging patterns
         [Parameter(Mandatory=$True)]
         [ValidateSet("manual", "teamcity", "vsts")]
-        [string]$executionEnv
+        [string]$executionEnv,
+        #if something specified - we shall filter resources on this; string could be separated by comma, dot or semicolon
+        [string]$resourceNameFilter
         )
 
     $logStringFormat = "{0}";
@@ -433,6 +435,11 @@ function Set-ResourceSizesForCostsSaving {
     $sqlServers = $resources.where( {$_.ResourceType -eq "Microsoft.Sql/servers" -And $_.ResourceGroupName -eq "$ResourceGroupName"});
     $virtualMachines = $resources.where( {$_.ResourceType -eq "Microsoft.Compute/virtualMachines" -And $_.ResourceGroupName -eq "$ResourceGroupName"});
     $vmScaleSets = $resources.where( {$_.ResourceType -eq "Microsoft.Compute/virtualMachineScaleSets" -And $_.ResourceGroupName -eq "$ResourceGroupName"});
+
+    if (![string]::IsNullOrWhiteSpace($resourceNameFilter)) {
+        $resourceNamesSplitted = $resourceNameFilter.Split(",.;");
+        #here I need to filter on $resourceNamesSplitted collections $webAppFarms, $sqlServers, $virtualMachines, $vmScaleSets
+    }
 
     ProcessWebApps -webAppFarms $webAppFarms -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
     ProcessSqlDatabases -sqlServers $sqlServers -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
