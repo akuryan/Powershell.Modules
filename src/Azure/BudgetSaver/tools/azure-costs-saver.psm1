@@ -7,6 +7,21 @@ function WriteLogToHost {
     Write-Host $message;
 }
 
+function ShallDownScaleDbBasedOnSkuEdition {
+    param (
+        [string]$currentDbEdition
+    )
+
+    #we should not downscale databases from Standard S0 or from ElasticPool
+
+    if ($currentDbEdition.ToLower() -ne "S0".ToLower() -and $currentDbEdition.ToLower() -ne "ElasticPool".ToLower()) {
+        return $true;
+    } else {
+        return $false;
+    }
+
+}
+
 function RetryCommand {
     [CmdletBinding()]
     Param(
@@ -271,7 +286,7 @@ function ProcessSqlDatabases {
                 }
 
                 if ($sqlDb.Edition -ne "Basic") {
-                    if ($sqlDb.CurrentServiceObjectiveName -ne "S0") {
+                    if (ShallDownScaleDbBasedOnSkuEdition -currentDbEdition $sqlDb.CurrentServiceObjectiveName) {
                         #store it as dbName:sku-edition
                         Write-Verbose "dbNameSkuEditionInfoString now is $dbNameSkuEditionInfoString";
                         $dbNameSkuEditionInfoString = $dbNameSkuEditionInfoString + ("{0}:{1}-{2};" -f $resourceName, $sqlDb.CurrentServiceObjectiveName, $sqlDb.Edition );
@@ -321,7 +336,7 @@ function ProcessSqlDatabases {
                 #proceed only in case we are not on Basic
                 if ($sqlDb.Edition -ne "Basic") {
                     #proceed only in case we are not at S0
-                    if ($sqlDb.CurrentServiceObjectiveName -ne "S0") {
+                    if (ShallDownScaleDbBasedOnSkuEdition -currentDbEdition $sqlDb.CurrentServiceObjectiveName) {
                         Write-Host "Downscaling $resourceName at server $sqlServerName to S0 size";
                         RetryCommand -ScriptBlock {
                             Set-AzureRmSqlDatabase -DatabaseName $resourceName -ResourceGroupName $sqlDb.ResourceGroupName -ServerName $sqlServerName -RequestedServiceObjectiveName S0 -Edition Standard;
