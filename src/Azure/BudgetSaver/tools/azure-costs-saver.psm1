@@ -9,8 +9,14 @@ function WriteLogToHost {
 
 function ShallDownScaleDbBasedOnSkuEdition {
     param (
-        [string]$currentDbSku
+        [string]$currentDbSku,
+        [stromg]$currentDbEdition
     )
+    #we should not downscale Basic databases
+    if ($currentDbEdition.ToLower() -eq "Basic".ToLower()) {
+        return $false;
+    }
+
     #we should not downscale databases from Standard S0 or from ElasticPool
     if ($currentDbSku.ToLower() -ne "S0".ToLower() -and $currentDbSku.ToLower() -ne "ElasticPool".ToLower()) {
         return $true;
@@ -285,13 +291,11 @@ function ProcessSqlDatabases {
                     $sqlServerTags.Remove($keyEdition);
                 }
 
-                if ($sqlDb.Edition -ne "Basic") {
-                    if (ShallDownScaleDbBasedOnSkuEdition -currentDbSku $sqlDb.CurrentServiceObjectiveName) {
-                        #store it as dbName:sku-edition
-                        Write-Verbose "dbNameSkuEditionInfoString now is $dbNameSkuEditionInfoString";
-                        $dbNameSkuEditionInfoString = $dbNameSkuEditionInfoString + ("{0}:{1}-{2};" -f $resourceName, $sqlDb.CurrentServiceObjectiveName, $sqlDb.Edition );
-                        Write-Verbose "dbNameSkuEditionInfoString became now $dbNameSkuEditionInfoString";
-                    }
+                if (ShallDownScaleDbBasedOnSkuEdition -currentDbSku $sqlDb.CurrentServiceObjectiveName -currentDbEdition $sqlDb.Edition) {
+                    #store it as dbName:sku-edition
+                    Write-Verbose "dbNameSkuEditionInfoString now is $dbNameSkuEditionInfoString";
+                    $dbNameSkuEditionInfoString = $dbNameSkuEditionInfoString + ("{0}:{1}-{2};" -f $resourceName, $sqlDb.CurrentServiceObjectiveName, $sqlDb.Edition );
+                    Write-Verbose "dbNameSkuEditionInfoString became now $dbNameSkuEditionInfoString";
                 }
             }
 
@@ -336,18 +340,13 @@ function ProcessSqlDatabases {
             if ($Downscale) {
                 if ($couldDownscale) {
                     #proceed if we written tags on SQL server level
-                    if ($sqlDb.Edition -ne "Basic") {
-                        #proceed only in case we are not on Basic
-                        if (ShallDownScaleDbBasedOnSkuEdition -currentDbSku $sqlDb.CurrentServiceObjectiveName) {
-                            Write-Host "Downscaling $resourceName at server $sqlServerName to S0 size";
-                            RetryCommand -ScriptBlock {
-                                Set-AzureRmSqlDatabase -DatabaseName $resourceName -ResourceGroupName $sqlDb.ResourceGroupName -ServerName $sqlServerName -RequestedServiceObjectiveName S0 -Edition Standard;
-                            }
-                        } else {
-                            Write-Verbose "We do not need to downscale db $resourceName at server $sqlServerName to S0 size (it is either S0 already or belongs to elastic pool)";
+                    if (ShallDownScaleDbBasedOnSkuEdition -currentDbSku $sqlDb.CurrentServiceObjectiveName -currentDbEdition $sqlDb.Edition) {
+                        Write-Host "Downscaling $resourceName at server $sqlServerName to S0 size";
+                        RetryCommand -ScriptBlock {
+                            Set-AzureRmSqlDatabase -DatabaseName $resourceName -ResourceGroupName $sqlDb.ResourceGroupName -ServerName $sqlServerName -RequestedServiceObjectiveName S0 -Edition Standard;
                         }
                     } else {
-                        Write-Verbose "We do not need to downscale db $resourceName at server $sqlServerName to S0 size as it is Basic already";
+                        Write-Verbose "We do not need to downscale db $resourceName at server $sqlServerName to S0 size (it is either S0 already or belongs to elastic pool or belongs to Basic edition)";
                     }
                 } else {
                     $messageToLog = "Could not downscale databases, as there is not enough space to allocate tags on sqlServer $sqlServerName";
