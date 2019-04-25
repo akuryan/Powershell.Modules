@@ -10,7 +10,7 @@ function WriteLogToHost {
 function ShallDownScaleDbBasedOnSkuEdition {
     param (
         [string]$currentDbSku,
-        [stromg]$currentDbEdition
+        [string]$currentDbEdition
     )
     #we should not downscale Basic databases
     if ($currentDbEdition.ToLower() -eq "Basic".ToLower()) {
@@ -23,7 +23,51 @@ function ShallDownScaleDbBasedOnSkuEdition {
     } else {
         return $false;
     }
+}
 
+function ShallDownscalePool {
+    param (
+        [string]$poolEdition,
+        [int]$poolDtu
+    )
+    if ($poolEdition.ToLower() -eq "Basic".ToLower()) {
+        #will not work with Basic pools now
+        return $false;
+    }
+
+    if ($poolEdition.ToLower() -eq "Free".ToLower()) {
+        #will not work with Free pools now
+        return $false;
+    }
+
+    if ($poolDtu -le 50) {
+        #pool is at minimum dtu already
+        return $false;
+    }
+
+    return $true;
+}
+
+function ParseTagsToSizesString {
+	param (
+		[string]$name,
+		[string]$tagsStringified
+	)
+	
+	$filterOn = ("{0}:*" -f $name);
+	Write-Verbose "We are going to filter $tagsStringified with filter $filterOn";
+	$replaceString = ("{0}:" -f $name);
+	#get DB size and edition
+	$tagsCollection = $tagsStringified.Split(';');
+	$tagsData = ($tagsCollection -like $filterOn);
+	Write-Verbose "We've found sku and edition for $name - it is $tagsData";
+	if (![string]::IsNullOrWhiteSpace($tagsData)) {
+		$tagsData = $tagsData.Replace($replaceString, "");
+		Write-Verbose "We've replaced and final sku and edition is $tagsData";
+		return $tagsData;
+	}
+	
+	return "";	
 }
 
 function RetryCommand {
@@ -248,6 +292,7 @@ function ProcessSqlDatabases {
         $couldDownscale = $false;
 
         $sqlDatabases = Get-AzureRmSqlDatabase -ResourceGroupName $sqlServerResource.ResourceGroupName -ServerName $sqlServerName;
+        $elasticPools = Get-AzureRmSqlElasticPool -ServerName $sqlServerName -ResourceGroupName $sqlServerResource.ResourceGroupName;
         #Get existing tags for SQL server
         $sqlServerTags = $sqlServerResource.Tags;
         if ($sqlServerTags.Count -eq 0)
@@ -269,14 +314,12 @@ function ProcessSqlDatabases {
                 }
             }
             Write-Verbose "We've found $keyCounter keys with database sizes"
-            for ($counter=0; $counter -lt $keyCounter; $counter++){
+            for ($counter=0; $counter -lt $keyCounter; $counter++) {
                 $key = $keySkuEdition + $counter;
                 Write-Verbose "Retrieving $key from tags"
                 $dbNameSkuEditionInfoString = $dbNameSkuEditionInfoString + $sqlServerTags[$key];
                 Write-Verbose "Retrieved so far: $dbNameSkuEditionInfoString";
             }
-
-            $databaseSizesSkuEditions = $dbNameSkuEditionInfoString.Split(';');
         } else {
             #collect sizes and save tags
             foreach ($sqlDb in $sqlDatabases.where( {$_.DatabaseName -ne "master"})) {
@@ -295,6 +338,15 @@ function ProcessSqlDatabases {
                     #store it as dbName:sku-edition
                     Write-Verbose "dbNameSkuEditionInfoString now is $dbNameSkuEditionInfoString";
                     $dbNameSkuEditionInfoString = $dbNameSkuEditionInfoString + ("{0}:{1}-{2};" -f $resourceName, $sqlDb.CurrentServiceObjectiveName, $sqlDb.Edition );
+                    Write-Verbose "dbNameSkuEditionInfoString became now $dbNameSkuEditionInfoString";
+                }
+            }
+
+            foreach ($pool in $elasticPools) {
+                if (ShallDownscalePool -poolEdition $pool.Edition -poolDtu $pool.Dtu) {
+                    #store pool data in tags as well
+                    Write-Verbose "dbNameSkuEditionInfoString now is $dbNameSkuEditionInfoString";
+                    $dbNameSkuEditionInfoString = $dbNameSkuEditionInfoString + ("{0}:{1}-{2}-{3}-{4};" -f $pool.ElasticPoolName, $pool.Edition, $pool.Dtu, $pool.DatabaseDtuMax, $pool.DatabaseDtuMin);
                     Write-Verbose "dbNameSkuEditionInfoString became now $dbNameSkuEditionInfoString";
                 }
             }
@@ -333,37 +385,26 @@ function ProcessSqlDatabases {
 
         foreach ($sqlDb in $sqlDatabases.where( {$_.DatabaseName -ne "master"}))
         {
-            $resourceName = $sqlDb.DatabaseName
+            $resourceName = $sqlDb.DatabaseName;
 
-            Write-Host "Performing requested operation on $resourceName"
+            Write-Host "Performing requested operation on database $resourceName";
 
             if ($Downscale) {
                 if ($couldDownscale) {
                     #proceed if we written tags on SQL server level
                     if (ShallDownScaleDbBasedOnSkuEdition -currentDbSku $sqlDb.CurrentServiceObjectiveName -currentDbEdition $sqlDb.Edition) {
-                        Write-Host "Downscaling $resourceName at server $sqlServerName to S0 size";
+                        Write-Host "Downscaling database $resourceName at server $sqlServerName to S0 size";
                         RetryCommand -ScriptBlock {
                             Set-AzureRmSqlDatabase -DatabaseName $resourceName -ResourceGroupName $sqlDb.ResourceGroupName -ServerName $sqlServerName -RequestedServiceObjectiveName S0 -Edition Standard;
                         }
                     } else {
                         Write-Verbose "We do not need to downscale db $resourceName at server $sqlServerName to S0 size (it is either S0 already or belongs to elastic pool or belongs to Basic edition)";
                     }
-                } else {
-                    $messageToLog = "Could not downscale databases, as there is not enough space to allocate tags on sqlServer $sqlServerName";
-                    WriteLogToHost -logMessage $messageToLog -logFormat $logStringFormat;
                 }
             } else {
-                $filterOn = ("{0}:*" -f $resourceName);
-                Write-Verbose "We are going to filter $dbNameSkuEditionInfoString with filter $filterOn";
-                $replaceString = ("{0}:" -f $resourceName);
-                #get DB size and edition
-                $skuEdition = ($databaseSizesSkuEditions -like $filterOn);
+                $skuEdition = ParseTagsToSizesString -name $resourceName -tagsStringified $dbNameSkuEditionInfoString;
                 Write-Verbose "We've found sku and edition for $resourceName - it is $skuEdition";
-                #ugly, a lot of branching, but could not think of any way
                 if (![string]::IsNullOrWhiteSpace($skuEdition)) {
-                    $skuEdition = $skuEdition.Replace($replaceString, "");
-                    Write-Verbose "We've replaced and final sku and edition is $skuEdition";
-                    #we have SkuEdition defined for database, which means that it was not Basic or Standard S0 prior to downscaling
                     if ($skuEdition.Split('-').Count -eq 2)
                     {
                         #we have exactly 2 values in our tag and could proceed further
@@ -373,6 +414,42 @@ function ProcessSqlDatabases {
                         Write-Host "Upscaling $resourceName at server $sqlServerName to $targetSize size"
                         RetryCommand -ScriptBlock {
                             Set-AzureRmSqlDatabase -DatabaseName $resourceName -ResourceGroupName $sqlDb.ResourceGroupName -ServerName $sqlServerName -RequestedServiceObjectiveName $targetSize -Edition $edition
+                        }
+                    }
+                }
+            }
+        }
+
+        foreach ($pool in $elasticPools) {
+            $resourceName = $pool.ElasticPoolName;
+            Write-Host "Performing requested operation on pool $resourceName";
+
+            if ($Downscale) {
+                if ($couldDownscale) {
+                    #proceed if we written tags on SQL server level
+                    if (ShallDownscalePool -poolEdition $pool.Edition -poolDtu $pool.Dtu) {
+                        Write-Host "Downscaling pool $resourceName at server $sqlServerName";
+                        RetryCommand -ScriptBlock {
+                            Set-AzureRmSqlElasticPool -ResourceGroupName $pool.ResourceGroupName -ServerName $sqlServerName -ElasticPoolName $resourceName -Edition Standard -Dtu 50 -DatabaseDtuMin 0 -DatabaseDtuMax 50;
+                        }
+                    } else {
+                        Write-Verbose "We do not need to downscale pool $resourceName at server $sqlServerName ";
+                    }
+                }
+            } else {
+                $poolData = ParseTagsToSizesString -name $resourceName -tagsStringified $dbNameSkuEditionInfoString;
+                Write-Verbose "We've found sku and edition for $resourceName - it is $poolData";
+                if (![string]::IsNullOrWhiteSpace($poolData)) {
+                    if ($poolData.Split('-').Count -eq 4)
+                    {
+                        #we have exactly 4 values in our tag and could proceed further
+                        $edition = $poolData.Split('-')[0];
+                        $dtu = [int]$poolData.Split('-')[1];
+                        $maxDbDtu = [int]$poolData.Split('-')[2];
+                        $minDbDtu = [int]$poolData.Split('-')[3];
+                        Write-Host "Upscaling $resourceName at server $sqlServerName";
+                        RetryCommand -ScriptBlock {
+                            Set-AzureRmSqlElasticPool -ResourceGroupName $pool.ResourceGroupName -ServerName $sqlServerName -ElasticPoolName $resourceName -Edition $edition -Dtu $dtu -DatabaseDtuMin $minDbDtu -DatabaseDtuMax $maxDbDtu;
                         }
                     }
                 }
