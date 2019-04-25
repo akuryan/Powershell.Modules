@@ -11,9 +11,7 @@ function ShallDownScaleDbBasedOnSkuEdition {
     param (
         [string]$currentDbEdition
     )
-
     #we should not downscale databases from Standard S0 or from ElasticPool
-
     if ($currentDbEdition.ToLower() -ne "S0".ToLower() -and $currentDbEdition.ToLower() -ne "ElasticPool".ToLower()) {
         return $true;
     } else {
@@ -236,18 +234,20 @@ function ProcessSqlDatabases {
     Write-Host "There is $amount $whatsProcessing to be processed."
 
     foreach ($sqlServer in $sqlServers) {
-        $sqlServerResourceId = $sqlServer.ResourceId
-        $sqlServerResource = Get-AzureRmResource -ResourceId $sqlServerResourceId -ExpandProperties
+        $sqlServerResourceId = $sqlServer.ResourceId;
+        $sqlServerResource = Get-AzureRmResource -ResourceId $sqlServerResourceId -ExpandProperties;
 
-		$sqlServerName =  $sqlServerResource.Name
+        $sqlServerName =  $sqlServerResource.Name;
+        #variable $couldDownscale holds if we could proceed with downscaling
+        $couldDownscale = $false;
 
-        $sqlDatabases = Get-AzureRmSqlDatabase -ResourceGroupName $sqlServerResource.ResourceGroupName -ServerName $sqlServerName
+        $sqlDatabases = Get-AzureRmSqlDatabase -ResourceGroupName $sqlServerResource.ResourceGroupName -ServerName $sqlServerName;
         #Get existing tags for SQL server
-        $sqlServerTags = $sqlServerResource.Tags
+        $sqlServerTags = $sqlServerResource.Tags;
         if ($sqlServerTags.Count -eq 0)
         {
             #there is no tags defined
-            $sqlServerTags = @{}
+            $sqlServerTags = @{};
         }
 
         #we will store all data in one string and then we will try to save it as tags to be parsed later
@@ -297,22 +297,24 @@ function ProcessSqlDatabases {
 
             #now we need to form up tags (tag have a limit of 256 chars per tag)
             $stringLength = $dbNameSkuEditionInfoString.Length;
-            Write-Verbose "dbNameSkuEditionInfoString have lenght of $stringLength"
+            Write-Verbose "dbNameSkuEditionInfoString have lenght of $stringLength";
             #how much tags we need to record our databases sizes
-            $tagsLimitCount = [Math]::ceiling( $stringLength/256)
-            Write-Verbose "We need $tagsLimitCount tags to write our db sizes"
+            $tagsLimitCount = [Math]::ceiling($stringLength/256);
+            Write-Verbose "We need $tagsLimitCount tags to write our db sizes";
 
             #count how much tags we will have in the end
-            $resultingTagsCount = $sqlServerTags.Count + $tagsLimitCount
+            $resultingTagsCount = $sqlServerTags.Count + $tagsLimitCount;
+            #we could downscale if we could save data in tags for SQL Server
+            $couldDownscale = $resultingTagsCount -le 15;
 
-            if ($resultingTagsCount -le 15) {
+            if ($couldDownscale) {
                 #we could not have more than 15 tags per resource but this is OK and we can proceed
                 for ($counter=0; $counter -lt $tagsLimitCount; $counter++){
                     $key = $keySkuEdition + $counter;
                     $value = ($dbNameSkuEditionInfoString.ToCharArray() | select -first 256) -join "";
                     #remove extracted data
                     $dbNameSkuEditionInfoString = $dbNameSkuEditionInfoString.Replace($value, "");
-                    $sqlServerTags[$key] = $value
+                    $sqlServerTags[$key] = $value;
                 }
             } else {
                 $messageToLog = "We could not save database sizes as tags, as we are over limit of 15 tags per resource on current sql server {0}. We need to write {1} in addition to existing tags" -f $sqlServerName, $resultingTagsCount;
@@ -330,23 +332,28 @@ function ProcessSqlDatabases {
             $resourceName = $sqlDb.DatabaseName
 
             Write-Host "Performing requested operation on $resourceName"
-            $resourceId = $sqlDb.ResourceId;
 
             if ($Downscale) {
-                #proceed only in case we are not on Basic
-                if ($sqlDb.Edition -ne "Basic") {
-                    #proceed only in case we are not at S0
-                    if (ShallDownScaleDbBasedOnSkuEdition -currentDbEdition $sqlDb.CurrentServiceObjectiveName) {
-                        Write-Host "Downscaling $resourceName at server $sqlServerName to S0 size";
-                        RetryCommand -ScriptBlock {
-                            Set-AzureRmSqlDatabase -DatabaseName $resourceName -ResourceGroupName $sqlDb.ResourceGroupName -ServerName $sqlServerName -RequestedServiceObjectiveName S0 -Edition Standard;
+                if ($couldDownscale) {
+                    #proceed if we written tags on SQL server level
+                    if ($sqlDb.Edition -ne "Basic") {
+                        #proceed only in case we are not on Basic
+                        if (ShallDownScaleDbBasedOnSkuEdition -currentDbEdition $sqlDb.CurrentServiceObjectiveName) {
+                            Write-Host "Downscaling $resourceName at server $sqlServerName to S0 size";
+                            RetryCommand -ScriptBlock {
+                                Set-AzureRmSqlDatabase -DatabaseName $resourceName -ResourceGroupName $sqlDb.ResourceGroupName -ServerName $sqlServerName -RequestedServiceObjectiveName S0 -Edition Standard;
+                            }
+                        } else {
+                            Write-Verbose "We do not need to downscale db $resourceName at server $sqlServerName to S0 size";
                         }
                     } else {
-                        Write-Verbose "We do not need to downscale db $resourceName at server $sqlServerName to S0 size";
+                        Write-Verbose "We do not need to downscale db $resourceName at server $sqlServerName to S0 size as it is Basic already";
                     }
                 } else {
-                    Write-Verbose "We do not need to downscale db $resourceName at server $sqlServerName to S0 size as it is Basic already";
+                    $messageToLog = "Could not downscale databases, as there is not enough space to allocate tags on sqlServer $sqlServerName";
+                    WriteLogToHost -logMessage $messageToLog -logFormat $logStringFormat;
                 }
+
             } else {
                 $filterOn = ("{0}:*" -f $resourceName);
                 Write-Verbose "We are going to filter $dbNameSkuEditionInfoString with filter $filterOn";
