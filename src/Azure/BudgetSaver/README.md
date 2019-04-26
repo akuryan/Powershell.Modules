@@ -1,5 +1,7 @@
 # Costs saver for Azure
 
+[![Build status](https://dev.azure.com/dobryak/Nuget%20packages/_apis/build/status/NuGet/CostsSaver-Azure.PowerShell)](https://dev.azure.com/dobryak/Nuget%20packages/_build/latest?definitionId=3)
+
 This module is designed to save on costs of resources in Azure. Usually, one is not using Test and Acceptance resources during nights and weekends, but not everybody can afford themselves to destroy those resources and recreate them (complex configurations, too much manual interventions, whateverYouNameIt).
 So, I created this small script, which requires your connection to Azure RM and wants your resource group name to proceed.
 
