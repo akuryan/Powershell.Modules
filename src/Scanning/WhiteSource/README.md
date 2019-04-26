@@ -1,5 +1,7 @@
 # Module
 
+[![Build status](https://dev.azure.com/dobryak/Nuget%20packages/_apis/build/status/NuGet/Scanners-WhiteSource.PowerShell)](https://dev.azure.com/dobryak/Nuget%20packages/_build/latest?definitionId=4)
+
 This module is used to ease whitesource scanning integration in different scanning scenarios, executed on machine with installed powershell. Also, it allows to define several mostly used parameters (by my use-cases) in configuration file, so - for big variety of projects there is no need to store WhiteSource configuration file repository.
 
 ## Caution
