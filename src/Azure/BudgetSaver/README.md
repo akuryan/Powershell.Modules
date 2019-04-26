@@ -1,11 +1,13 @@
 # Costs saver for Azure
 
+[![Build status](https://dev.azure.com/dobryak/Nuget%20packages/_apis/build/status/NuGet/CostsSaver-Azure.PowerShell)](https://dev.azure.com/dobryak/Nuget%20packages/_build/latest?definitionId=3)
+
 This module is designed to save on costs of resources in Azure. Usually, one is not using Test and Acceptance resources during nights and weekends, but not everybody can afford themselves to destroy those resources and recreate them (complex configurations, too much manual interventions, whateverYouNameIt).
 So, I created this small script, which requires your connection to Azure RM and wants your resource group name to proceed.
 
-If you select to downscale your resources (suggestion: run it at evening) - it will find all SQL databases, all web apps and all VMs belonging to given resource group and will downscale web apps and sql databases to lowest possible size, vm's will be deprovisioned. If you select to upscale resources - script will read tags on them and upscale resources (web app and sql databases), vm's will be started.
+If you select to downscale your resources (suggestion: run it at evening) - it will find all SQL databases and elastic pools, all web apps and all VMs belonging to given resource group and will downscale web apps and sql databases and pools to lowest possible size, vm's will be deprovisioned. If you select to upscale resources - script will read tags on them and upscale resources (web app and sql databases and elastic pools), vm's will be started.
 
-SQL databases sizes tags are stored on SQL server resource, as they tend to dissappear on SQL database resource.
+SQL databases sizes tags are stored on SQL server resource, as they tend to dissappear from SQL database resource.
 
 ## Word of advise
 
@@ -16,6 +18,8 @@ Be extra careful when modifying this module, as it consumed by Teamcity metarunn
 1. Script will silently fail if you try to run upscaling before downscaling
 
 1. Script will fail if Tags are missing
+
+1. Script could fail if there is elastic pool with the same name as database.
 
 ## Use case
 
