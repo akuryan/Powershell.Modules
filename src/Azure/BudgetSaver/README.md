@@ -42,7 +42,7 @@ Do not forget to login :) to Azure
 
 ### VSTS extension
 
-See [VSTS marketplace](https://marketplace.visualstudio.com/items?itemName=anton-kuryan.AzureCostsSaver) or [blog post](https://colours.nl/azure-costs-saver)
+See [VSTS marketplace](https://marketplace.visualstudio.com/items?itemName=anton-kuryan.AzureCostsSaver) or [blog post](https://dobryak.org/saving-money-with-azure-costs-saver-vsts-extension/)
 
 ### Teamcity metarunner
 
