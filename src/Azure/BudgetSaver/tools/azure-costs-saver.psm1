@@ -179,6 +179,14 @@ function ProcessWebApps {
                 foreach ($app in $apps) {
                     $appName = $app.Name;
                     $appRg = $app.ResourceGroup;
+                    
+                    #https://github.com/Azure/azure-powershell/issues/5760
+                    # use the resource group parameter if the webapp resource group is null
+                    if (!$appRg)
+                    {
+                        $appRg = $ResourceGroupName
+                    }
+
                     Write-Verbose "Trying to get slot for $appName in resource group $appRg";
                     #If web app have slots - it could not be downscaled to Basic :(
                     #test for presence of slot
