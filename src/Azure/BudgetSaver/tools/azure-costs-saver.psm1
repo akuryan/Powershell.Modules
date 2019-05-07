@@ -182,7 +182,7 @@ function ProcessWebApps {
                     
                     #https://github.com/Azure/azure-powershell/issues/5760
                     # use the resource group parameter if the webapp resource group is null
-                    if (!$appRg)
+                    if ([string]::IsNullOrWhiteSpace($appRg))
                     {
                         $appRg = $ResourceGroupName
                     }
