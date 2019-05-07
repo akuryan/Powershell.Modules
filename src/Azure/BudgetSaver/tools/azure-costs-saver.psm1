@@ -206,6 +206,10 @@ function ProcessWebApps {
                     Write-Host "Downscaling $resourceName to tier: Basic, workerSize: Small and 1 worker"
                     Set-AzureRmAppServicePlan -Tier Basic -NumberofWorkers 1 -WorkerSize Small -ResourceGroupName $webFarmResource.ResourceGroupName -Name $webFarmResource.Name
                 }
+
+                #write tags to web app after scaling (sometimes tags disappear)
+                Set-AzureRmResource -ResourceId $resourceId -Tag $tags -Force
+                (Get-AzureRmResource -ResourceId $resourceId).Tags
             }
         }
         else {
@@ -231,6 +235,11 @@ function ProcessWebApps {
             if ($excludedTiers -notcontains $targetTier) {
                 Write-Host "Upscaling $resourceName to tier: $targetTier, workerSize: $targetWorkerSize with $targetAmountOfWorkers workers";
                 Set-AzureRmAppServicePlan -Tier $targetTier -NumberofWorkers $targetAmountOfWorkers -WorkerSize $verbSize -ResourceGroupName $webFarmResource.ResourceGroupName -Name $webFarmResource.Name;
+                
+                #write tags to web app after scaling (sometimes tags disappear)
+                Set-AzureRmResource -ResourceId $resourceId -Tag $tags -Force
+                (Get-AzureRmResource -ResourceId $resourceId).Tags
+
                 foreach ($app in $apps) {
                     #sometimes during upscale - app will stall in disabled state (though it is running), so I will restart it here one more time (this fixes problem)
                     Restart-AzureRmWebApp $app;
