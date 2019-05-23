@@ -17,8 +17,8 @@ function ShallDownScaleDbBasedOnSkuEdition {
         return $false;
     }
 
-    #we should not downscale databases from Standard S0 or from ElasticPool
-    if ($currentDbSku.ToLower() -ne "S0".ToLower() -and $currentDbSku.ToLower() -ne "ElasticPool".ToLower()) {
+    #we should not downscale databases from Standard S0 or from ElasticPool (ElasticPool in vCore model returns None for database SKU in AzureRM)
+    if ($currentDbSku.ToLower() -ne "S0".ToLower() -and $currentDbSku.ToLower() -ne "ElasticPool".ToLower() -and $currentDbSku.ToLower() -ne "None".ToLower()) {
         return $true;
     } else {
         return $false;
