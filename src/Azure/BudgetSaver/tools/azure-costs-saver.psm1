@@ -388,8 +388,8 @@ function ProcessSqlDatabases {
             if ($couldDownscale) {
                 #we could not have more than 15 tags per resource but this is OK and we can proceed
                 #Store tags on SQL server
-                Set-AzureRmResource -ResourceId $sqlServerResourceId -Tag $sqlServerTags -Force
-                (Get-AzureRmResource -ResourceId $sqlServerResourceId).Tags
+                Set-AzureRmResource -ResourceId $sqlServerResourceId -Tag $sqlServerTags -Force;
+                (Get-AzureRmResource -ResourceId $sqlServerResourceId).Tags;
             } else {
                 #count how much tags we will have in the end
                 $resultingTagsCount = $sqlServerTags.Count;
@@ -534,13 +534,13 @@ function Set-ResourceSizesForCostsSaving {
     Write-Host "Resources will be selected from $ResourceGroupName resource group"
 
     #Get all resources, which are in resource groups, which contains our name
-    $resources = Get-AzureRmResource | Where-Object {$_.ResourceGroupName -eq $ResourceGroupName}
+    $resources = Get-AzureRmResource | Where-Object {$_.ResourceGroupName -eq $ResourceGroupName};
 
     if (($resources | Measure-Object).Count -le 0)
     {
         $messageToLog = "No resources was retrieved for resource group {0}" -f $ResourceGroupName;
-        WriteLogToHost -logMessage $messageToLog -logFormat $logStringFormat
-        Exit $false
+        WriteLogToHost -logMessage $messageToLog -logFormat $logStringFormat;
+        Exit $false;
     }
 
     ProcessWebApps -webAppFarms $resources.where( {$_.ResourceType -eq "Microsoft.Web/serverFarms" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
