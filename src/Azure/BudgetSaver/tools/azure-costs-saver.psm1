@@ -520,6 +520,9 @@ function Set-ResourceSizesForCostsSaving {
         [string]$executionEnv
         )
 
+    #To display version during execution - I will output it in host and replace at build time
+    Write-Host "NuGet version is #{placeHolderForVersion}#";
+
     $logStringFormat = "{0}";
     if ($executionEnv -eq "teamcity")
     {

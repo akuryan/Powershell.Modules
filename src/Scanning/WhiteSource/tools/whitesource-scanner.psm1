@@ -58,6 +58,9 @@ function Scan-Sources {
         [string]$ScanPath
     )
 
+    #To display version during execution - I will output it in host and replace at build time
+    Write-Host "NuGet version is #{placeHolderForVersion}#";
+
     [Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls";
 
     if ([string]::IsNullOrWhiteSpace($AgentPath)) {
