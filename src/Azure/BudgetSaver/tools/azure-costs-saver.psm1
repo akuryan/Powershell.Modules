@@ -546,8 +546,35 @@ function Set-ResourceSizesForCostsSaving {
         Exit $false;
     }
 
-    ProcessWebApps -webAppFarms $resources.where( {$_.ResourceType -eq "Microsoft.Web/serverFarms" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
-    ProcessSqlDatabases -sqlServers $resources.where( {$_.ResourceType -eq "Microsoft.Sql/servers" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
-    ProcessVirtualMachines -vms $resources.where( {$_.ResourceType -eq "Microsoft.Compute/virtualMachines" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
-    ProcessVirtualMachinesScaleSets -vmScaleSets $resources.where( {$_.ResourceType -eq "Microsoft.Compute/virtualMachineScaleSets" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
+    function ExecuteProcessSqlDatabase()
+    {
+        ProcessSqlDatabases -sqlServers $resources.where( {$_.ResourceType -eq "Microsoft.Sql/servers" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
+    }
+    function ExecuteProcessWebApps()
+    {
+        ProcessWebApps -webAppFarms $resources.where( {$_.ResourceType -eq "Microsoft.Web/serverFarms" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
+    }
+    function ExecuteProcessVirtualMachines()
+    {
+        ProcessVirtualMachines -vms $resources.where( {$_.ResourceType -eq "Microsoft.Compute/virtualMachines" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
+    }
+    function ExecuteProcessVirtualMachinesScaleSets()
+    {
+        ProcessVirtualMachinesScaleSets -vmScaleSets $resources.where( {$_.ResourceType -eq "Microsoft.Compute/virtualMachineScaleSets" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
+    }
+
+    if($Upscale)
+    {
+        ExecuteProcessSqlDatabase;
+        ExecuteProcessWebApps;
+        ExecuteProcessVirtualMachines;
+        ExecuteProcessVirtualMachinesScaleSets;
+    }
+    if($Downscale)
+    {   
+        ExecuteProcessWebApps;
+        ExecuteProcessVirtualMachines;
+        ExecuteProcessVirtualMachinesScaleSets;
+        ExecuteProcessSqlDatabase;        
+    }
 }
