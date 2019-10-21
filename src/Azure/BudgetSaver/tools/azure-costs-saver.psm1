@@ -563,18 +563,16 @@ function Set-ResourceSizesForCostsSaving {
         ProcessVirtualMachinesScaleSets -vmScaleSets $resources.where( {$_.ResourceType -eq "Microsoft.Compute/virtualMachineScaleSets" -And $_.ResourceGroupName -eq "$ResourceGroupName"}) -logStringFormat $logStringFormat -ResourceGroupName $ResourceGroupName;
     }
 
-    if($Upscale)
-    {
-        ExecuteProcessSqlDatabase;
-        ExecuteProcessWebApps;
-        ExecuteProcessVirtualMachines;
-        ExecuteProcessVirtualMachinesScaleSets;
-    }
-    if($Downscale)
-    {   
+    if($Downscale){   
         ExecuteProcessWebApps;
         ExecuteProcessVirtualMachines;
         ExecuteProcessVirtualMachinesScaleSets;
         ExecuteProcessSqlDatabase;        
+    }
+	else {
+        ExecuteProcessSqlDatabase;
+        ExecuteProcessWebApps;
+        ExecuteProcessVirtualMachines;
+        ExecuteProcessVirtualMachinesScaleSets;
     }
 }
